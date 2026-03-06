@@ -43,7 +43,7 @@ services:
     container_name: backend
     build: ./backend
     restart: always
-    command: bash -c "./release.sh && gunicorn --bind 0.0.0.0:8000 --workers 4 --worker-class uvicorn.workers.UvicornWorker --timeout 300 app.asgi:application"
+    command: bash -c "./release.sh && uvicorn app.asgi:application --host 0.0.0.0 --port 8000 --workers 4"
     expose:
       - "8000"
     depends_on:

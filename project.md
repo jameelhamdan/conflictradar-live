@@ -38,7 +38,7 @@ Browser
         ├── /django_static/ → backend:8000 Whitenoise static files
         └── /             → frontend:80  React SPA
 
-backend (gunicorn :8000)
+backend (uvicorn :8000)
   ├── services/api/       DRF serializers + APIView endpoints
   ├── services/accounts/  Custom User model
   └── core/               Article, Event, Source models (MongoDB)
@@ -188,7 +188,7 @@ An aggregated event derived from one or more Articles at the same location.
 | ------- | ------- | ---- |
 | nginx | :80, :443 | Reverse proxy + TLS termination |
 | certbot | — | Let's Encrypt cert renewal (every 12h) |
-| backend | internal :8000 | Django + gunicorn |
+| backend | internal :8000 | Django + uvicorn |
 | worker | :8001 | RQ workers + scheduler + health check |
 | frontend | internal :80 | React SPA (nginx:alpine) |
 | mongo | :27017 | Database |

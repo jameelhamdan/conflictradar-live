@@ -14,7 +14,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 | Ingestion | Telethon (Telegram) + requests |
 | NLP | spaCy + VADER + geopy |
 | Frontend | React 19 + Vite + react-leaflet |
-| Serving | gunicorn (backend) + nginx reverse proxy |
+| Serving | uvicorn (backend) + nginx reverse proxy |
 | Containers | Docker Compose |
 
 ---
@@ -29,7 +29,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 │   ├── app/                # WSGI/ASGI entry, URLs, middleware, auth backend
 │   │   ├── __init__.py     # Version info (reads version.txt from project root)
 │   │   ├── asgi.py         # ASGI application entry point
-│   │   ├── wsgi.py         # WSGI application entry point (gunicorn)
+│   │   ├── wsgi.py         # WSGI application entry point (unused; uvicorn runs asgi.py)
 │   │   ├── urls.py         # Root URLconf — admin/ + api/
 │   │   ├── backends.py     # ModelAuthBackend (respects user.can_login)
 │   │   └── middleware.py   # X-App-Version header

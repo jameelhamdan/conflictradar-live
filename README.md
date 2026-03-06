@@ -16,7 +16,7 @@ See [project.md](project.md) for full requirements and architecture. See [CLAUDE
 | Ingestion | Telethon (Telegram) + scrapling + requests |
 | NLP | HuggingFace transformers (dslim/bert-base-NER) + VADER + sentence-transformers + mordecai3 |
 | Frontend | React 19 + Waku + react-leaflet + TypeScript |
-| Serving | gunicorn + nginx (reverse proxy + TLS) |
+| Serving | uvicorn + nginx (reverse proxy + TLS) |
 | TLS | Let's Encrypt via certbot |
 | Containers | Docker Compose |
 
