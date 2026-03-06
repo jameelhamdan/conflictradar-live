@@ -1,0 +1,340 @@
+[
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "bbc-world",
+      "type": "rss",
+      "name": "BBC World News",
+      "description": "World news from the BBC.",
+      "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "aljazeera-world",
+      "type": "rss",
+      "name": "Al Jazeera World",
+      "description": "World news from Al Jazeera English.",
+      "url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "guardian-world",
+      "type": "rss",
+      "name": "The Guardian World",
+      "description": "World news from The Guardian.",
+      "url": "https://www.theguardian.com/world/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "france24-world",
+      "type": "rss",
+      "name": "France 24 World",
+      "description": "International news from France 24 English.",
+      "url": "https://www.france24.com/en/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "dw-world",
+      "type": "rss",
+      "name": "Deutsche Welle World",
+      "description": "World news from DW English.",
+      "url": "https://rss.dw.com/rdf/rss-en-world",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "euronews-world",
+      "type": "rss",
+      "name": "Euronews World",
+      "description": "World news from Euronews English.",
+      "url": "https://www.euronews.com/rss?format=mrss&level=theme&name=news",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "rfi-world",
+      "type": "rss",
+      "name": "RFI World News",
+      "description": "International news from Radio France Internationale.",
+      "url": "https://www.rfi.fr/en/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "npr-world",
+      "type": "rss",
+      "name": "NPR World News",
+      "description": "World news from NPR.",
+      "url": "https://feeds.npr.org/1004/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "sky-world",
+      "type": "rss",
+      "name": "Sky News World",
+      "description": "World news from Sky News.",
+      "url": "https://feeds.skynews.com/feeds/rss/world.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "rt-world",
+      "type": "rss",
+      "name": "RT World News",
+      "description": "World news from RT.",
+      "url": "https://www.rt.com/rss/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "tass-world",
+      "type": "rss",
+      "name": "TASS World News",
+      "description": "World news from TASS Russian news agency.",
+      "url": "https://tass.com/rss/v2.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "xinhua-world",
+      "type": "rss",
+      "name": "Xinhua World News",
+      "description": "World news from Xinhua News Agency.",
+      "url": "http://www.xinhuanet.com/english/rss/worldrss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "middle-east-eye",
+      "type": "rss",
+      "name": "Middle East Eye",
+      "description": "News and analysis from the Middle East and North Africa.",
+      "url": "https://www.middleeasteye.net/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "dawn-pk",
+      "type": "rss",
+      "name": "Dawn (Pakistan)",
+      "description": "Latest news from Dawn, Pakistan's leading English newspaper.",
+      "url": "https://www.dawn.com/feeds/latest-news",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "scmp-world",
+      "type": "rss",
+      "name": "South China Morning Post",
+      "description": "News from the South China Morning Post covering Asia and the world.",
+      "url": "https://www.scmp.com/rss/91/feed",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "techcrunch",
+      "type": "rss",
+      "name": "TechCrunch",
+      "description": "Technology news and analysis from TechCrunch.",
+      "url": "https://techcrunch.com/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "the-verge",
+      "type": "rss",
+      "name": "The Verge",
+      "description": "Technology, science, art, and culture news from The Verge.",
+      "url": "https://www.theverge.com/rss/index.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "ars-technica",
+      "type": "rss",
+      "name": "Ars Technica",
+      "description": "Technology news, analysis, and reviews from Ars Technica.",
+      "url": "http://feeds.arstechnica.com/arstechnica/index",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "wired",
+      "type": "rss",
+      "name": "Wired",
+      "description": "Technology, science, and culture news from Wired.",
+      "url": "https://www.wired.com/feed/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "mit-tech-review",
+      "type": "rss",
+      "name": "MIT Technology Review",
+      "description": "Technology news and analysis from MIT Technology Review.",
+      "url": "https://www.technologyreview.com/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "reuters-business",
+      "type": "rss",
+      "name": "Reuters Business",
+      "description": "Business and financial news from Reuters.",
+      "url": "https://feeds.reuters.com/reuters/businessNews",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "economist-finance",
+      "type": "rss",
+      "name": "The Economist Finance & Economics",
+      "description": "Finance and economics coverage from The Economist.",
+      "url": "https://www.economist.com/finance-and-economics/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "cnbc-top",
+      "type": "rss",
+      "name": "CNBC Top News",
+      "description": "Top business and financial news from CNBC.",
+      "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "marketwatch",
+      "type": "rss",
+      "name": "MarketWatch Top Stories",
+      "description": "Financial markets and business news from MarketWatch.",
+      "url": "https://feeds.marketwatch.com/marketwatch/topstories/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "guardian-economics",
+      "type": "rss",
+      "name": "The Guardian Economics",
+      "description": "Economics news and analysis from The Guardian.",
+      "url": "https://www.theguardian.com/business/economics/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "hacker-news",
+      "type": "rss",
+      "name": "Hacker News",
+      "description": "Top stories from Hacker News (Y Combinator).",
+      "url": "https://news.ycombinator.com/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  }
+]

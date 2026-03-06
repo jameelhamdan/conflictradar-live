@@ -1,0 +1,344 @@
+import typing
+from dataclasses import dataclass
+from uuid import uuid4
+from django.utils.translation import gettext_lazy as _
+from django.db import models
+from django_mongodb_backend.managers import MongoManager
+
+
+class SourceType(models.TextChoices):
+    TELEGRAM = 'telegram'
+    WEBSITE = 'website'
+    API = 'api'
+    RSS = 'rss'
+    SOCIAL = 'social'
+    EMAIL = 'email'
+    NEWSLETTER = 'newsletter'
+    DATABASE = 'database'
+
+    @classmethod
+    def headers_keys(cls):
+        return [
+            (cls.TELEGRAM.value, ['TELEGRAM_API_ID', 'TELEGRAM_API_HASH', 'TELEGRAM_SESSION']),
+        ]
+
+
+class Source(models.Model):
+    code = models.CharField(max_length=64, unique=True, help_text=_('Unique identifier for the source'))
+    type = models.CharField(max_length=64, choices=SourceType.choices)
+    name = models.CharField(max_length=128, help_text=_('Display name of the source'))
+    description = models.TextField(blank=True)
+    url = models.URLField(max_length=255, default='', blank=True, help_text=_('URL of the source, used in website and RSS feeds'))
+    author_slug = models.CharField(max_length=255, default='', blank=True, help_text=_('Author of the source, used in telegram as channel username'))
+    headers = models.JSONField(default=dict, blank=True)
+    is_enabled = models.BooleanField(default=True, help_text=_('Uncheck to disable fetching from this source'))
+
+    updated_on = models.DateTimeField(auto_now=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+
+    class Meta:
+        ordering = ['-created_on']
+        indexes = [
+            models.Index(fields=['created_on']),
+        ]
+
+    def get_header(self, key, default=None) -> typing.Any:
+        if not self.headers:
+            return default
+
+        return self.headers.get(key, default)
+
+    def __str__(self):
+        return self.name
+
+
+class EventCategory(models.TextChoices):
+    CONFLICT = 'conflict', _('Conflict')
+    PROTEST = 'protest', _('Protest')
+    DISASTER = 'disaster', _('Disaster')
+    POLITICAL = 'political', _('Political')
+    ECONOMIC = 'economic', _('Economic')
+    CRIME = 'crime', _('Crime')
+    GENERAL = 'general', _('General')
+
+
+class Article(models.Model):
+    id = models.UUIDField(default=uuid4, editable=False, primary_key=True)
+    source_code = models.CharField(max_length=64)
+    source_type = models.CharField(max_length=64, choices=SourceType.choices)
+    source_url = models.URLField(max_length=512)
+
+    author = models.CharField(max_length=100)
+    author_slug = models.CharField(max_length=100)
+
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    published_on = models.DateTimeField()
+
+    related = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    # NLP fields — populated by process_articles
+    entities = models.JSONField(default=list, blank=True)
+    sentiment = models.FloatField(null=True, blank=True)
+    location = models.CharField(max_length=255, null=True, blank=True)
+    event_intensity = models.FloatField(null=True, blank=True)
+    category = models.CharField(
+        max_length=64,
+        choices=EventCategory.choices,
+        null=True,
+        blank=True,
+        help_text=_('Rule-based event category'),
+    )
+    sub_category = models.CharField(max_length=64, null=True, blank=True)
+    processed_on = models.DateTimeField(null=True, blank=True)
+
+    # Geocoding — populated by aggregate_events
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
+    updated_on = models.DateTimeField(auto_now=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    extra_data = models.JSONField(default=dict, blank=True)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-created_on']
+        indexes = [
+            models.Index(fields=['created_on']),
+            models.Index(fields=['source_code']),
+            models.Index(fields=['author_slug']),
+            models.Index(fields=['category']),
+            models.Index(fields=['processed_on']),
+            models.Index(fields=['location']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+
+class Event(models.Model):
+    """
+    An aggregated event derived from one or more related articles
+    at the same location within a time window.
+    Populated by the aggregate_events management command.
+    """
+    title = models.CharField(max_length=512)
+    content = models.TextField()
+    category = models.CharField(
+        max_length=64,
+        choices=EventCategory.choices,
+        default=EventCategory.GENERAL,
+    )
+
+    # Geographic fields
+    location_name = models.CharField(max_length=255)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
+    # Temporal
+    started_at = models.DateTimeField(help_text=_('Timestamp of the earliest article'))
+
+    # Aggregated metrics
+    article_count = models.IntegerField(default=1)
+    avg_sentiment = models.FloatField(null=True, blank=True)
+    avg_intensity = models.FloatField(null=True, blank=True)
+
+    # References
+    article_ids = models.JSONField(default=list)
+    source_codes = models.JSONField(default=list)
+
+    updated_on = models.DateTimeField(auto_now=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['started_at']),
+            models.Index(fields=['category']),
+            models.Index(fields=['location_name']),
+        ]
+
+    def __str__(self):
+        return f'{self.location_name} | {self.category} | {self.started_at:%Y-%m-%d}'
+
+
+class PriceTick(models.Model):
+    """One price sample for a symbol, stored for up to 1 year (TTL index)."""
+    symbol      = models.CharField(max_length=32)                  # "BTC-USD", "GC=F", "SPY" — covered by compound index prefix
+    stream_key  = models.CharField(max_length=32)                  # "crypto", "commodity", "stock", "forex", "bond"
+    name        = models.CharField(max_length=64)                  # "Bitcoin", "Gold"
+    value       = models.FloatField()
+    change_pct  = models.FloatField(null=True, blank=True)         # % vs previous close
+    volume      = models.FloatField(null=True, blank=True)
+    occurred_at = models.DateTimeField(db_index=True)              # standalone time-range queries
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-occurred_at']
+        indexes = [
+            models.Index(fields=['symbol', 'occurred_at']),
+            models.Index(fields=['stream_key']),
+        ]
+
+    def __str__(self):
+        return f'{self.symbol} {self.value} @ {self.occurred_at:%Y-%m-%d %H:%M}'
+
+
+class NotamRecord(models.Model):
+    """NOTAM alert — append-only history."""
+    notam_id       = models.CharField(max_length=128, unique=True)  # unique=True creates index
+    source_region  = models.CharField(max_length=32)               # "FAA", "ICAO"
+    notam_type     = models.CharField(max_length=32)               # "TFR", "prohibited", "restricted", "danger"
+    status         = models.CharField(max_length=16)               # "active", "expired", "cancelled"
+    effective_from = models.DateTimeField()
+    effective_to   = models.DateTimeField(null=True, blank=True)
+    geometry       = models.JSONField(default=dict)                # GeoJSON Feature
+    altitude_min_ft = models.IntegerField(null=True, blank=True)
+    altitude_max_ft = models.IntegerField(null=True, blank=True)
+    location_name  = models.CharField(max_length=255, blank=True)
+    country_code   = models.CharField(max_length=4, blank=True)
+    raw_text       = models.TextField(blank=True)
+    fetched_at     = models.DateTimeField(auto_now_add=True)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-effective_from']
+        indexes = [
+            models.Index(fields=['effective_from', 'effective_to']),
+            models.Index(fields=['status']),
+            models.Index(fields=['country_code']),
+        ]
+
+    def __str__(self):
+        return f'{self.notam_id} [{self.status}]'
+
+
+class NotamZone(models.Model):
+    """Current live NOTAM zone — upserted on every fetch, not appended."""
+    notam_id        = models.CharField(max_length=128, unique=True)  # unique=True creates index
+    notam_type      = models.CharField(max_length=32)
+    geometry        = models.JSONField(default=dict)               # GeoJSON Feature
+    effective_from  = models.DateTimeField()
+    effective_to    = models.DateTimeField(null=True, blank=True)
+    is_active       = models.BooleanField(default=True)            # indexed via Meta.indexes
+    location_name   = models.CharField(max_length=255, blank=True)
+    country_code    = models.CharField(max_length=4, blank=True)
+    altitude_min_ft = models.IntegerField(null=True, blank=True)
+    altitude_max_ft = models.IntegerField(null=True, blank=True)
+    updated_at      = models.DateTimeField(auto_now=True)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-effective_from']
+        indexes = [
+            models.Index(fields=['is_active']),
+            models.Index(fields=['effective_to']),
+        ]
+
+    def __str__(self):
+        return f'{self.notam_id} ({"active" if self.is_active else "inactive"})'
+
+
+class EarthquakeRecord(models.Model):
+    """USGS earthquake event."""
+    usgs_id        = models.CharField(max_length=32, unique=True)   # unique=True creates index
+    magnitude      = models.FloatField()                           # indexed via Meta.indexes
+    magnitude_type = models.CharField(max_length=8, blank=True)   # "ml", "mb", "mw"
+    depth_km       = models.FloatField(null=True, blank=True)
+    location_name  = models.CharField(max_length=255)
+    latitude       = models.FloatField()
+    longitude      = models.FloatField()
+    occurred_at    = models.DateTimeField()                        # indexed via Meta.indexes
+    tsunami_alert  = models.BooleanField(default=False)
+    alert_level    = models.CharField(max_length=16, blank=True)  # "green", "yellow", "orange", "red"
+    fetched_at     = models.DateTimeField(auto_now_add=True)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-occurred_at']
+        indexes = [
+            models.Index(fields=['occurred_at']),
+            models.Index(fields=['magnitude']),
+        ]
+
+    def __str__(self):
+        return f'M{self.magnitude} {self.location_name} {self.occurred_at:%Y-%m-%d}'
+
+
+class StaticPointType(models.TextChoices):
+    EXCHANGE           = 'exchange',           _('Stock Exchange')
+    COMMODITY_EXCHANGE = 'commodity_exchange', _('Commodity Exchange')
+    PORT               = 'port',               _('Major Port')
+    CENTRAL_BANK       = 'central_bank',       _('Central Bank')
+
+
+class StaticPoint(models.Model):
+    """Static geographic reference point (exchange, port, central bank, etc.)."""
+    code         = models.CharField(max_length=32, unique=True)    # unique=True creates index
+    point_type   = models.CharField(max_length=32, choices=StaticPointType.choices)  # indexed via Meta.indexes
+    name         = models.CharField(max_length=128)
+    country      = models.CharField(max_length=64)
+    country_code = models.CharField(max_length=4)
+    latitude     = models.FloatField()
+    longitude    = models.FloatField()
+    metadata     = models.JSONField(default=dict)   # timezone, website, symbols, currencies, etc.
+    is_active    = models.BooleanField(default=True)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['point_type', 'name']
+        indexes = [
+            models.Index(fields=['point_type']),
+            models.Index(fields=['country_code']),
+        ]
+
+    def __str__(self):
+        return f'{self.name} ({self.code})'
+
+
+# ---------------------------------------------------------------------------
+# NLP data transfer objects — used by services/cleaning and services/core/tasks
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ArticleDocument:
+    """Input DTO for the NLP pipeline, built from an Article instance."""
+    id: str
+    title: str
+    content: str
+    source_code: str
+    published_on: str  # ISO-8601 string
+
+    @property
+    def full_text(self) -> str:
+        return f'{self.title} {self.content}'
+
+
+@dataclass
+class ArticleFeatures:
+    """NLP output for a single article, returned by ArticleCleaner."""
+    id: str
+    entities: list[dict]    # [{text: str, label: str}]
+    sentiment: float        # VADER compound score [-1, 1]
+    location: str | None    # 'City, Country' from LLM analysis
+    latitude: float | None  # from geonamescache city lookup
+    longitude: float | None # from geonamescache city lookup
+    event_intensity: float  # computed score [0, 1]
+    category: str           # LLM-assigned category slug
+    sub_category: str | None  # LLM-assigned sub-category slug within category
+    llm_data: dict          # raw LLM response — stored in article.extra_data['llm']

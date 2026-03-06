@@ -1,0 +1,119 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="pipeline-toolbar">
+  <form method="post" action="">
+    {% csrf_token %}
+    <div class="pipeline-toolbar__inner">
+
+      <div class="pipeline-section">
+        <span class="pipeline-section__label">Fetch</span>
+        <label class="pipeline-field">
+          Source
+          <input type="text" name="fetch_source" placeholder="all" maxlength="64">
+        </label>
+        <label class="pipeline-field">
+          Hours
+          <input type="number" name="fetch_hours" value="2" min="1" max="720" style="width:5em">
+        </label>
+        <button class="button pipeline-btn" name="pipeline_action" value="fetch">Fetch Articles</button>
+      </div>
+
+      <div class="pipeline-section">
+        <span class="pipeline-section__label">Process</span>
+        <label class="pipeline-field">
+          Limit
+          <input type="number" name="process_limit" value="500" min="1" max="10000" style="width:6em">
+        </label>
+        <button class="button pipeline-btn" name="pipeline_action" value="process">Process Articles</button>
+      </div>
+
+      <div class="pipeline-section">
+        <span class="pipeline-section__label">Aggregate</span>
+        <label class="pipeline-field">
+          Hours
+          <input type="number" name="aggregate_hours" value="24" min="1" max="720" style="width:5em">
+        </label>
+        <button class="button pipeline-btn" name="pipeline_action" value="aggregate">Aggregate Events</button>
+      </div>
+
+      <div class="pipeline-section pipeline-section--run-all">
+        <button class="button pipeline-btn pipeline-btn--run-all" name="pipeline_action" value="run_all">
+          ▶ Run All
+        </button>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<style>
+.pipeline-toolbar {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: #1e2228;
+  border: 1px solid #2c3038;
+  border-radius: 4px;
+}
+.pipeline-toolbar__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px;
+}
+.pipeline-section {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding-right: 20px;
+  border-right: 1px solid #2c3038;
+}
+.pipeline-section:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+.pipeline-section__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #79aec8;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+.pipeline-field {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: #999;
+  gap: 3px;
+}
+.pipeline-field input {
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid #2c3038;
+  border-radius: 3px;
+  background: #13171c;
+  color: #e0e0e0;
+}
+.pipeline-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pipeline-btn--run-all {
+  background: #417690;
+  color: #fff;
+  border-color: #2c5770;
+  font-weight: 600;
+  padding: 6px 16px;
+}
+.pipeline-btn--run-all:hover {
+  background: #2c5770;
+}
+</style>
+
+{{ block.super }}
+{% endblock %}

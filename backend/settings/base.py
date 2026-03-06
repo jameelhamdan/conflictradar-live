@@ -1,0 +1,295 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
+import app
+
+from decouple import config
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent   # .../backend/
+BASE_DIR = BACKEND_DIR.parent                           # project root
+
+# App Versioning
+try:
+    commit_id = subprocess.check_output(["git", "describe", "--always"], cwd=BASE_DIR).decode('utf-8').strip()
+except Exception as e:
+    commit_id = ''
+
+VERSION_NUMBER = app.__version__
+
+if commit_id:
+    app.__build__ = f'{VERSION_NUMBER}-{commit_id}'
+else:
+    app.__build__ = f'{VERSION_NUMBER}'
+
+ENV_NAME = config('ENV_NAME', default='development')
+VERSION = f'{ENV_NAME}-{app.__build__}'
+
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = False
+
+ADMINS = (
+    ('admin', 'contact@conflictradar.live'),
+)
+
+ALLOWED_HOSTS = ['*']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost').split(',')
+
+INSTALLED_APPS = [
+    'django_mongodb_backend',
+    'apps.MongoAdminConfig',
+    'apps.MongoAuthConfig',
+    'apps.MongoContentTypesConfig',
+    'qsessions',
+    'django.contrib.messages',
+    'django.contrib.sitemaps',
+    'django.contrib.staticfiles',
+
+    'django_rq',
+    'rest_framework',
+    'import_export',
+
+    # Apps
+    'accounts',
+    'core',
+    'api',
+    'services',
+]
+
+MIDDLEWARE = [
+    'app.middleware.VersionHeaderMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'qsessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+ROOT_URLCONF = 'app.urls'
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [
+            os.path.join(BACKEND_DIR, 'templates'),
+        ],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'root': {
+        'level': 'INFO',
+        'handlers': ['console'],
+    },
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(filename)s %(funcName)s %(process)d %(thread)d %(threadName)s %(message)s',
+        },
+        "rq_console": {
+            "format": "%(asctime)s %(message)s",
+            "datefmt": "%H:%M:%S",
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
+    'handlers': {
+        'null': {
+            'level': 'DEBUG',
+            'class': 'logging.NullHandler',
+        },
+        'console': {
+            'level': 'ERROR',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'stream': sys.stdout,
+        },
+        'api_handler': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'stream': sys.stdout,
+        },
+        "rq_console": {
+            "level": "DEBUG",
+            "class": "rq.logutils.ColorizingStreamHandler",
+            "formatter": "rq_console",
+            "exclude": ["%(asctime)s"],
+        },
+    },
+    'loggers': {
+        'api': {
+            'handlers': ['api_handler'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'services': {
+            'handlers': ['api_handler'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'rq.worker': {
+            'handlers': ['console', 'rq_console'],
+            'level': 'INFO',
+            'propagate': config('ENABLE_WORKER_ERROR_EMAILS', default=False, cast=bool),
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.security.DisallowedHost': {
+            'handlers': ['null'],
+            'propagate': False,
+        },
+    },
+}
+
+# WSGI_APPLICATION = 'app.wsgi_application'
+ASGI_APPLICATION = 'app.asgi.application'
+# os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1024
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
+# Mongo are required
+DATABASE_URL = config('DATABASE_URL', default='mongodb://root:1234@localhost:27017/radar-live?authSource=admin')
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django_mongodb_backend',
+        'HOST': DATABASE_URL,
+    }
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    },
+    'redis-cache': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': config('REDIS_URL', default='redis://localhost:6379/0'),
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000,
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    },
+}
+
+RQ_SHOW_ADMIN_LINK = True
+TASK_QUEUE_ENABLED = config('TASK_QUEUE_ENABLED', default=False, cast=bool)
+
+# LLM backend — 'openrouter' (default) or 'ollama'
+LLM_BACKEND = config('LLM_BACKEND', default='openrouter')
+
+# OpenRouter (https://openrouter.ai) — used when LLM_BACKEND=openrouter
+# Comma-separated lists — multiple keys rotate round-robin; models tried in order on failure
+OPENROUTER_API_KEYS = config('OPENROUTER_API_KEYS', default='')
+OPENROUTER_MODELS = config('OPENROUTER_MODELS', default='openrouter/free')
+
+# Ollama — used when LLM_BACKEND=ollama
+OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='')   # e.g. http://my-server:11434
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3')
+
+RQ_QUEUES = {
+    'high': {
+        'ASYNC': TASK_QUEUE_ENABLED,
+        'USE_REDIS_CACHE': 'redis-cache',
+    },
+    'default': {
+        'ASYNC': TASK_QUEUE_ENABLED,
+        'USE_REDIS_CACHE': 'redis-cache',
+    },
+    'low': {
+        'ASYNC': TASK_QUEUE_ENABLED,
+        'USE_REDIS_CACHE': 'redis-cache',
+    },
+}
+
+CRON_CLASSES = []
+
+AUTH_USER_MODEL = 'accounts.User'
+SESSION_ENGINE = 'qsessions.backends.cached_db'
+DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'
+SILENCED_SYSTEM_CHECKS = ['mongodb.E001']
+MIGRATION_MODULES = {
+    "admin": "migrations.admin",
+    "auth": "migrations.auth",
+    "contenttypes": "migrations.contenttypes",
+    "accounts": "migrations.accounts",
+    "core": "migrations.core",
+}
+
+AUTHENTICATION_BACKENDS = ['app.backends.ModelAuthBackend']
+
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # One month session time
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 9,
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+LANGUAGE_CODE = 'en-ca'
+
+TIME_ZONE = 'UTC'
+
+# USE_I18N and USE_L10N are deprecated in Django 6.0 (always enabled)
+# They are kept here for backward compatibility but have no effect
+USE_I18N = False
+
+USE_L10N = False
+
+USE_TZ = True
+
+DATE_FORMAT = 'Y-m-d'
+DATETIME_FORMAT = 'Y-m-d H:i'
+SHORT_DATE_FORMAT = 'Y-m-d'
+SHORT_DATETIME_FORMAT = 'Y-m-d H:i'
+TIME_FORMAT = 'H:i'
+
+STATIC_URL = '/django_static/'
+STATIC_ROOT = BACKEND_DIR / '.static'
+
+FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+STORAGES = {
+    'default': {
+        'BACKEND': FILE_STORAGE,
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}

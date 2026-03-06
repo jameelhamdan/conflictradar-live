@@ -1,0 +1,97 @@
+services:
+  certbot:
+    container_name: certbot
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_GA_ID: ${VITE_GA_ID:-}
+    command: sh -c "cp -r /app/dist/public/. /frontend_dist/"
+    restart: "no"
+    volumes:
+      - ./frontend_dist:/frontend_dist
+
+  nginx:
+    container_name: nginx
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend_dist:/usr/share/nginx/html:ro
+      - ./.static:/django_static:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    env_file: .env
+    depends_on:
+      frontend:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+
+  backend:
+    container_name: backend
+    build: ./backend
+    restart: always
+    command: bash -c "./release.sh && gunicorn --bind 0.0.0.0:8000 --workers 4 --worker-class uvicorn.workers.UvicornWorker --timeout 300 app.asgi:application"
+    expose:
+      - "8000"
+    depends_on:
+      - mongo
+      - redis
+    env_file: .env.app
+    volumes:
+      - ./media_data:/app/media
+      - ./.static:/app/.static
+
+  worker:
+    container_name: worker
+    build: ./backend
+    restart: always
+    command: python ./worker.py
+    expose:
+      - "8001"
+    depends_on:
+      - mongo
+      - redis
+    env_file: .env.app
+    volumes:
+      - ./media_data:/app/media
+
+  scheduler:
+    container_name: scheduler
+    build: ./backend
+    restart: always
+    command: python ./scheduler.py
+    depends_on:
+      - mongo
+      - redis
+    env_file: .env.app
+    volumes:
+      - ./media_data:/app/media
+
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    restart: always
+
+  mongo:
+    container_name: mongo
+    image: mongo:8.2
+    restart: always
+    ports:
+      - "27017:27017"
+    env_file: .env.db
+    volumes:
+      - ./mongo/data:/data/db
+      - ./mongo/config:/data/configdb
