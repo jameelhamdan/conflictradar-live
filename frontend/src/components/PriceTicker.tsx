@@ -141,7 +141,7 @@ export default function PriceTicker({ latestTick }: PriceTickerProps) {
       {/* Rows */}
       <div style={{ maxHeight: 200, overflowY: 'auto' }}>
         {loading
-          ? <div style={{ padding: '0.75rem', fontSize: '0.72rem', color: '#33334a' }}>Loading…</div>
+          ? <div style={{ padding: '0.75rem', fontSize: '0.72rem', color: '#33334a',minHeight:200 }}>Loading…</div>
           : ticks.length === 0
             ? <div style={{ padding: '0.75rem', fontSize: '0.72rem', color: '#33334a' }}>No data yet</div>
             : ticks.map(t => (

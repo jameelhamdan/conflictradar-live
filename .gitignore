@@ -144,6 +144,8 @@ frontend_dist/
 
 anon.session
 certbot/*
+
+docs
 mongo/*
 media_data/*
 .static

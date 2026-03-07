@@ -1,54 +1,61 @@
-"use client";
+'use client';
 
-import "../globals.css";
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import EventList from "./EventList";
-import PriceTicker from "./PriceTicker";
-import { fetchEvents } from "../api/events";
-import { useSSE } from "../hooks/useSSE";
-import { categoryColor, categoryShapeComponent } from "../constants";
-import type { EventSummary, EventFilters } from "../types";
+import '../globals.css';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import EventList from './EventList';
+import PriceTicker from './PriceTicker';
+import { fetchEvents } from '../api/events';
+import { useSSE } from '../hooks/useSSE';
+import { categoryColor, categoryShapeComponent } from '../constants';
+import type { EventSummary, EventFilters } from '../types';
 
-const MapView = lazy(() => import("./MapView"));
+const MapView = lazy(() => import('./MapView'));
 const POLL_INTERVAL_MS = 60_000;
 
 const CATEGORY_TABS = [
-  { value: "", label: "All" },
-  { value: "conflict", label: "Conflict" },
-  { value: "protest", label: "Protest" },
-  { value: "disaster", label: "Disaster" },
-  { value: "political", label: "Political" },
-  { value: "economic", label: "Economic" },
-  { value: "crime", label: "Crime" },
-  { value: "general", label: "General" },
+  { value: '', label: 'All' },
+  { value: 'conflict', label: 'Conflict' },
+  { value: 'protest', label: 'Protest' },
+  { value: 'disaster', label: 'Disaster' },
+  { value: 'political', label: 'Political' },
+  { value: 'economic', label: 'Economic' },
+  { value: 'crime', label: 'Crime' },
+  { value: 'general', label: 'General' },
 ] as const;
 
 const QUICK_FILTERS = [
-  { value: "6h", label: "6h", ms: 6 * 60 * 60 * 1000 },
-  { value: "24h", label: "24h", ms: 24 * 60 * 60 * 1000 },
-  { value: "7d", label: "7d", ms: 7 * 24 * 60 * 60 * 1000 },
-  { value: "30d", label: "30d", ms: 30 * 24 * 60 * 60 * 1000 },
+  { value: '6h', label: '6h', ms: 6 * 60 * 60 * 1000 },
+  { value: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
+  { value: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
+  { value: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
 ] as const;
 
-type QuickFilter = (typeof QUICK_FILTERS)[number]["value"] | "";
+type QuickFilter = (typeof QUICK_FILTERS)[number]['value'] | '';
 
 export default function App() {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<EventFilters>({ category: "" });
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
+  const [filters, setFilters] = useState<EventFilters>({ category: '' });
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('');
   const [mounted, setMounted] = useState(false);
+
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"map" | "list">("map");
+  const [mobileTab, setMobileTab] = useState<'map' | 'list'>('map');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Stream layers
   const [showNotams, setShowNotams] = useState(true);
   const [showEarthquakes, setShowEarthquakes] = useState(true);
   const [showStaticPoints, setShowStaticPoints] = useState(true);
   const [streamRefresh, setStreamRefresh] = useState(0);
-  const [latestPriceTick, setLatestPriceTick] = useState<{ symbol: string; value: number; change_pct: number | null; occurred_at: string } | null>(null);
+  const [latestPriceTick, setLatestPriceTick] = useState<{
+    symbol: string;
+    value: number;
+    change_pct: number | null;
+    occurred_at: string;
+  } | null>(null);
 
   // SSE: push stream refresh counter and price updates
   useSSE((event) => {
@@ -87,10 +94,12 @@ export default function App() {
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
-    function check() { setIsMobile(window.innerWidth < 768); }
+    function check() {
+      setIsMobile(window.innerWidth < 768);
+    }
     check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
   useEffect(() => {
     load();
@@ -98,61 +107,81 @@ export default function App() {
     return () => clearInterval(timer);
   }, [load]);
 
+  // Track window size for mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Trigger map resize when sidebar toggles on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 50);
+    }
+  }, [sidebarOpen, isMobile]);
+
   function clearQuickFilter() {
-    setQuickFilter("");
+    setQuickFilter('');
   }
 
   function handleSelectEvent(id: string) {
     setSelectedId(id);
-    if (isMobile) setMobileTab("map");
+    if (isMobile) setMobileTab('map');
   }
 
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        overflow: "hidden",
-        background: "#0f0f13",
-        color: "#e0e0e0",
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        overflow: 'hidden',
+        background: '#0f0f13',
+        color: '#e0e0e0',
       }}
     >
       <header
         style={{
           flexShrink: 0,
-          background: "#13131c",
-          borderBottom: "1px solid #1e1e2a",
+          background: '#13131c',
+          borderBottom: '1px solid #1e1e2a',
         }}
       >
         {/* Row 1 */}
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            padding: "0 1rem",
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '0 1rem',
             height: 44,
-            borderBottom: "1px solid #1a1a26",
-            overflowX: "auto",
-            scrollbarWidth: "none",
+            borderBottom: '1px solid #1a1a26',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
           }}
         >
           <a
             href="/"
             style={{
-              display: "flex",
-              alignItems: "center",
-              textDecoration: "none",
+              display: 'flex',
+              alignItems: 'center',
+              textDecoration: 'none',
               flexShrink: 0,
             }}
           >
             <span
               style={{
                 fontWeight: 700,
-                fontSize: "0.95rem",
-                letterSpacing: "-0.01em",
-                color: "#e8e8f0",
+                fontSize: '0.95rem',
+                letterSpacing: '-0.01em',
+                color: '#e8e8f0',
               }}
             >
               conflictradar
@@ -160,9 +189,9 @@ export default function App() {
             <span
               style={{
                 fontWeight: 700,
-                fontSize: "0.95rem",
-                letterSpacing: "-0.01em",
-                color: "#e05252",
+                fontSize: '0.95rem',
+                letterSpacing: '-0.01em',
+                color: '#e05252',
               }}
             >
               .live
@@ -172,20 +201,20 @@ export default function App() {
           {!isMobile && (
             <nav
               style={{
-                display: "flex",
-                gap: "0.15rem",
-                alignItems: "center",
+                display: 'flex',
+                gap: '0.15rem',
+                alignItems: 'center',
                 flexShrink: 0,
               }}
             >
               <a
                 href="/about"
                 style={{
-                  color: "#55556a",
-                  fontSize: "0.8rem",
+                  color: '#55556a',
+                  fontSize: '0.8rem',
                   fontWeight: 500,
-                  textDecoration: "none",
-                  padding: "0.2rem 0.45rem",
+                  textDecoration: 'none',
+                  padding: '0.2rem 0.45rem',
                   borderRadius: 4,
                 }}
               >
@@ -194,11 +223,11 @@ export default function App() {
               <a
                 href="/newsletter"
                 style={{
-                  color: "#55556a",
-                  fontSize: "0.8rem",
+                  color: '#55556a',
+                  fontSize: '0.8rem',
                   fontWeight: 500,
-                  textDecoration: "none",
-                  padding: "0.2rem 0.45rem",
+                  textDecoration: 'none',
+                  padding: '0.2rem 0.45rem',
                   borderRadius: 4,
                 }}
               >
@@ -206,12 +235,35 @@ export default function App() {
               </a>
             </nav>
           )}
-
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: sidebarOpen ? '#7c9ef8' : '#55556a',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              padding: '0.2rem 0.4rem',
+              width: '1.6rem',
+              height: '1.6rem',
+              display: 'flex',
+              visibility: isMobile ? 'visible' : 'hidden',
+              pointerEvents: isMobile ? 'auto' : 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: '0.25rem',
+              transition: 'color 0.12s',
+              flexShrink: 0,
+            }}
+          >
+            {sidebarOpen ? '▢' : '≡'}
+          </button>
           <div
             style={{
               width: 1,
               height: 18,
-              background: "#1e1e2a",
+              background: '#1e1e2a',
               flexShrink: 0,
             }}
           />
@@ -219,12 +271,12 @@ export default function App() {
           {/* Time filters */}
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.2rem",
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.2rem',
               flex: 1,
-              overflowX: "auto",
-              scrollbarWidth: "none",
+              overflowX: 'auto',
+              scrollbarWidth: 'none',
             }}
           >
             {/* Quick preset buttons */}
@@ -234,22 +286,22 @@ export default function App() {
                 <button
                   key={qf.value}
                   onClick={() => {
-                    setQuickFilter(active ? "" : qf.value);
-                    setFilters((f) => ({ ...f, start: "", end: "" }));
+                    setQuickFilter(active ? '' : qf.value);
+                    setFilters((f) => ({ ...f, start: '', end: '' }));
                   }}
                   style={{
-                    fontSize: "0.75rem",
+                    fontSize: '0.75rem',
                     fontWeight: active ? 600 : 400,
-                    padding: "0.18rem 0.52rem",
+                    padding: '0.18rem 0.52rem',
                     borderRadius: 99,
-                    border: `1px solid ${active ? "#7c9ef844" : "transparent"}`,
-                    background: active ? "#7c9ef81a" : "transparent",
-                    color: active ? "#7c9ef8" : "#55556a",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
+                    border: `1px solid ${active ? '#7c9ef844' : 'transparent'}`,
+                    background: active ? '#7c9ef81a' : 'transparent',
+                    color: active ? '#7c9ef8' : '#55556a',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
                     flexShrink: 0,
                     transition:
-                      "color 0.12s, background 0.12s, border-color 0.12s",
+                      'color 0.12s, background 0.12s, border-color 0.12s',
                   }}
                 >
                   {qf.label}
@@ -262,12 +314,12 @@ export default function App() {
                 onClick={clearQuickFilter}
                 title="Clear time filter"
                 style={{
-                  background: "none",
-                  border: "none",
-                  color: "#44445a",
-                  fontSize: "0.7rem",
-                  cursor: "pointer",
-                  padding: "0.1rem 0.25rem",
+                  background: 'none',
+                  border: 'none',
+                  color: '#44445a',
+                  fontSize: '0.7rem',
+                  cursor: 'pointer',
+                  padding: '0.1rem 0.25rem',
                   borderRadius: 3,
                   lineHeight: 1,
                   flexShrink: 0,
@@ -280,14 +332,14 @@ export default function App() {
 
           <span
             style={{
-              fontSize: "0.76rem",
-              color: "#44445a",
-              whiteSpace: "nowrap",
+              fontSize: '0.76rem',
+              color: '#44445a',
+              whiteSpace: 'nowrap',
               flexShrink: 0,
             }}
           >
             {loading
-              ? "Loading…"
+              ? 'Loading…'
               : error
                 ? `⚠ ${error}`
                 : `${events.length} events`}
@@ -297,18 +349,18 @@ export default function App() {
         {/* Row 2 — category tabs */}
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.2rem",
-            padding: "0 0.75rem",
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.2rem',
+            padding: '0 0.75rem',
             height: 34,
-            overflowX: "auto",
-            scrollbarWidth: "none",
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
           }}
         >
           {CATEGORY_TABS.map((tab) => {
             const active = filters.category === tab.value;
-            const color = tab.value ? categoryColor(tab.value) : "#7c9ef8";
+            const color = tab.value ? categoryColor(tab.value) : '#7c9ef8';
             const Shape = tab.value ? categoryShapeComponent(tab.value) : null;
             return (
               <button
@@ -317,34 +369,39 @@ export default function App() {
                   setFilters((f) => ({
                     ...f,
                     category:
-                      tab.value !== "" && f.category === tab.value
-                        ? ""
+                      tab.value !== '' && f.category === tab.value
+                        ? ''
                         : tab.value,
                   }))
                 }
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.28rem",
-                  fontSize: "0.77rem",
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.28rem',
+                  fontSize: '0.77rem',
                   fontWeight: active ? 600 : 400,
-                  padding: "0.18rem 0.6rem",
+                  padding: '0.18rem 0.6rem',
                   borderRadius: 99,
-                  border: `1px solid ${active ? color + "55" : color + "22"}`,
-                  background: active ? color + "22" : "transparent",
-                  color: active ? color : color + "bb",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
+                  border: `1px solid ${active ? color + '55' : color + '22'}`,
+                  background: active ? color + '22' : 'transparent',
+                  color: active ? color : color + 'bb',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
                   flexShrink: 0,
                   transition:
-                    "color 0.12s, background 0.12s, border-color 0.12s",
-                  letterSpacing: "0.01em",
+                    'color 0.12s, background 0.12s, border-color 0.12s',
+                  letterSpacing: '0.01em',
                 }}
               >
-                {Shape
-                  ? <Shape size={10} color={active ? color : color + "bb"} />
-                  : <span style={{ fontSize: "0.62rem", opacity: active ? 1 : 0.55 }}>◉</span>
-                }
+                {Shape ? (
+                  <Shape size={10} color={active ? color : color + 'bb'} />
+                ) : (
+                  <span
+                    style={{ fontSize: '0.62rem', opacity: active ? 1 : 0.55 }}
+                  >
+                    ◉
+                  </span>
+                )}
                 {tab.label}
               </button>
             );
@@ -352,13 +409,27 @@ export default function App() {
         </div>
       </header>
 
-      <main style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
+      <main
+        style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
         {/* Map section — always rendered; on mobile fills the full main area */}
-        <section style={{ flex: isMobile ? "1 1 auto" : "1 1 60%", minWidth: 0, position: "relative" }}>
+        <section
+          style={{
+            flex: isMobile ? (sidebarOpen ? 0 : 1) : '1 1 60%',
+            minWidth: 0,
+            position: 'relative',
+            display: isMobile && sidebarOpen ? 'none' : 'block',
+          }}
+        >
           {mounted && (
             <Suspense
               fallback={
-                <div style={{ height: "100%", background: "#191920" }} />
+                <div style={{ height: '100%', background: '#191920' }} />
               }
             >
               <MapView
@@ -374,35 +445,57 @@ export default function App() {
           )}
 
           {/* Layer toggles — hidden on mobile when list tab is active */}
-          {(!isMobile || mobileTab === "map") && (
-            <div style={{
-              position: "absolute",
-              bottom: isMobile ? 16 : 28,
-              left: 10,
-              zIndex: 1000,
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.25rem",
-            }}>
-              {([
-                { key: "notams",       label: "NOTAMs",     color: "#ff6644", value: showNotams,       set: setShowNotams },
-                { key: "earthquakes",  label: "Earthquakes", color: "#7c6ef8", value: showEarthquakes,  set: setShowEarthquakes },
-                { key: "staticPoints", label: "Locations",   color: "#4fc3f7", value: showStaticPoints, set: setShowStaticPoints },
-              ] as const).map(({ key, label, color, value, set }) => (
+          {(!isMobile || mobileTab === 'map') && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: isMobile ? 16 : 28,
+                left: 10,
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.25rem',
+              }}
+            >
+              {(
+                [
+                  {
+                    key: 'notams',
+                    label: 'NOTAMs',
+                    color: '#ff6644',
+                    value: showNotams,
+                    set: setShowNotams,
+                  },
+                  {
+                    key: 'earthquakes',
+                    label: 'Earthquakes',
+                    color: '#7c6ef8',
+                    value: showEarthquakes,
+                    set: setShowEarthquakes,
+                  },
+                  {
+                    key: 'staticPoints',
+                    label: 'Locations',
+                    color: '#4fc3f7',
+                    value: showStaticPoints,
+                    set: setShowStaticPoints,
+                  },
+                ] as const
+              ).map(({ key, label, color, value, set }) => (
                 <button
                   key={key}
                   onClick={() => set((v) => !v)}
                   style={{
-                    fontSize: "0.7rem",
+                    fontSize: '0.7rem',
                     fontWeight: value ? 600 : 400,
-                    padding: "0.2rem 0.55rem",
+                    padding: '0.2rem 0.55rem',
                     borderRadius: 99,
-                    border: `1px solid ${value ? color + "66" : "#2a2a3a"}`,
-                    background: value ? color + "22" : "#0d0d1488",
-                    color: value ? color : "#44445a",
-                    cursor: "pointer",
-                    backdropFilter: "blur(4px)",
-                    whiteSpace: "nowrap",
+                    border: `1px solid ${value ? color + '66' : '#2a2a3a'}`,
+                    background: value ? color + '22' : '#0d0d1488',
+                    color: value ? color : '#44445a',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(4px)',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {label}
@@ -417,18 +510,24 @@ export default function App() {
           style={{
             ...(isMobile
               ? {
-                  position: "absolute",
+                  position: 'absolute',
                   inset: 0,
                   zIndex: 500,
-                  display: mobileTab === "list" ? "flex" : "none",
-                  flexDirection: "column",
+                  display: mobileTab === 'list' ? 'flex' : 'none',
+                  flexDirection: 'column',
                 }
               : {
-                  flex: "0 0 380px",
-                  borderLeft: "1px solid #1e1e2a",
+                  flex: '0 0 380px',
+                  borderLeft: '1px solid #1e1e2a',
                 }),
-            overflowY: "auto",
-            background: "#0d0d14",
+            overflowY: 'auto',
+            borderLeft: isMobile ? 'none' : '1px solid #1e1e2a',
+
+            background: '#0d0d14',
+            display: isMobile && !sidebarOpen ? 'none' : 'flex',
+            flexDirection: 'column',
+            minWidth: 0,
+            flex: isMobile ? (sidebarOpen ? 1 : 0) : '0 0 380px',
           }}
         >
           <PriceTicker latestTick={latestPriceTick} />
@@ -439,30 +538,42 @@ export default function App() {
           />
           <div
             style={{
-              padding: "0.85rem 1rem",
-              borderTop: "1px solid #1a1a26",
+              padding: '0.85rem 1rem',
+              borderTop: '1px solid #1a1a26',
             }}
           >
             <div
               style={{
-                marginTop: "0.1rem",
-                display: "flex",
-                gap: "1rem",
-                flexWrap: "wrap",
-                fontSize: "0.72rem",
-                color: "#33334a",
+                marginTop: '0.1rem',
+                display: 'flex',
+                gap: '1rem',
+                flexWrap: 'wrap',
+                fontSize: '0.72rem',
+                color: '#33334a',
               }}
             >
-              <a href="/newsletter" style={{ color: "#7c9ef8", textDecoration: "none" }}>
+              <a
+                href="/newsletter"
+                style={{ color: '#7c9ef8', textDecoration: 'none' }}
+              >
                 Daily Briefing
               </a>
-              <a href="/terms" style={{ color: "#33334a", textDecoration: "none" }}>
+              <a
+                href="/terms"
+                style={{ color: '#33334a', textDecoration: 'none' }}
+              >
                 Terms
               </a>
-              <a href="/privacy" style={{ color: "#33334a", textDecoration: "none" }}>
+              <a
+                href="/privacy"
+                style={{ color: '#33334a', textDecoration: 'none' }}
+              >
                 Privacy
               </a>
-              <a href="/about" style={{ color: "#33334a", textDecoration: "none" }}>
+              <a
+                href="/about"
+                style={{ color: '#33334a', textDecoration: 'none' }}
+              >
                 About
               </a>
             </div>
@@ -475,40 +586,45 @@ export default function App() {
         <nav
           style={{
             flexShrink: 0,
-            display: "flex",
+            display: 'flex',
             height: 52,
-            background: "#13131c",
-            borderTop: "1px solid #1e1e2a",
+            background: '#13131c',
+            borderTop: '1px solid #1e1e2a',
           }}
         >
-          {(["map", "list"] as const).map((tab) => {
+          {(['map', 'list'] as const).map((tab) => {
             const active = mobileTab === tab;
             return (
               <button
                 key={tab}
-                onClick={() => { setMobileTab(tab); setSection("map"); }}
+                onClick={() => {
+                  setMobileTab(tab);
+                  setSection('map');
+                }}
                 style={{
                   flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.15rem",
-                  background: "none",
-                  border: "none",
-                  borderTop: `2px solid ${active ? "#7c9ef8" : "transparent"}`,
-                  color: active ? "#7c9ef8" : "#44445a",
-                  fontSize: "0.7rem",
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.15rem',
+                  background: 'none',
+                  border: 'none',
+                  borderTop: `2px solid ${active ? '#7c9ef8' : 'transparent'}`,
+                  color: active ? '#7c9ef8' : '#44445a',
+                  fontSize: '0.7rem',
                   fontWeight: active ? 600 : 400,
-                  cursor: "pointer",
-                  transition: "color 0.12s",
-                  WebkitTapHighlightColor: "transparent",
+                  cursor: 'pointer',
+                  transition: 'color 0.12s',
+                  WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>
-                  {tab === "map" ? "⬡" : "☰"}
+                <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>
+                  {tab === 'map' ? '⬡' : '☰'}
                 </span>
-                {tab === "map" ? "Map" : `Events${events.length ? ` (${events.length})` : ""}`}
+                {tab === 'map'
+                  ? 'Map'
+                  : `Events${events.length ? ` (${events.length})` : ''}`}
               </button>
             );
           })}
@@ -516,21 +632,21 @@ export default function App() {
             href="/newsletter"
             style={{
               flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.15rem",
-              background: "none",
-              border: "none",
-              borderTop: "2px solid transparent",
-              color: "#44445a",
-              fontSize: "0.7rem",
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.15rem',
+              background: 'none',
+              border: 'none',
+              borderTop: '2px solid transparent',
+              color: '#44445a',
+              fontSize: '0.7rem',
               fontWeight: 400,
-              textDecoration: "none",
+              textDecoration: 'none',
             }}
           >
-            <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>✉</span>
+            <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>✉</span>
             Briefings
           </a>
         </nav>
