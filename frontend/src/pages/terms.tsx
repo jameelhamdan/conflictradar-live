@@ -29,6 +29,8 @@ const UL = {
   marginBottom: '0.75rem',
 } as const
 
+import SiteHeader from '../components/SiteHeader'
+
 export default function TermsPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#0f0f13', color: '#e0e0e0' }}>
@@ -36,18 +38,7 @@ export default function TermsPage() {
       <meta name="description" content="Terms of Service and Disclaimer for conflictradar.live." />
       <link rel="canonical" href="https://conflictradar.live/terms" />
 
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 2rem', height: 44,
-        background: '#13131c', borderBottom: '1px solid #222230',
-      }}>
-        <a href="/" style={{ color: '#55556a', fontSize: '0.82rem', fontWeight: 500, textDecoration: 'none' }}>
-          ← Live map
-        </a>
-        <a href="/about" style={{ color: '#55556a', fontSize: '0.82rem', fontWeight: 500, textDecoration: 'none' }}>
-          About
-        </a>
-      </nav>
+      <SiteHeader />
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '3rem 2rem 5rem' }}>
         <header style={{ marginBottom: '3rem' }}>

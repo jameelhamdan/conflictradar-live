@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchNewsletter } from "../api/newsletter";
-import type { NewsletterDetail } from "../api/newsletter";
+import { fetchNewsletter } from "../../api/newsletter";
+import type { NewsletterDetail } from "../../api/newsletter";
 
 interface Props {
   date: string;

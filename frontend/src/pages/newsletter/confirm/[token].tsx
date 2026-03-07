@@ -1,4 +1,4 @@
-import ConfirmClient from '../../../components/ConfirmClient'
+import ConfirmClient from '../../../components/newsletter/ConfirmClient'
 
 export default function ConfirmPage() {
   return <ConfirmClient />

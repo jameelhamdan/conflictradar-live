@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { GeoJSON, Tooltip } from 'react-leaflet'
 import type { PathOptions } from 'leaflet'
-import { fetchNotamZones } from '../api/streams'
-import type { NotamZone } from '../types'
+import { fetchNotamZones } from '../../api/streams'
+import type { NotamZone } from '../../types'
 
 const NOTAM_TYPE_COLOR: Record<string, string> = {
   tfr:        '#ff4444',

@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { fetchEventDetail } from '../api/events'
-import { categoryColor } from '../constants'
+import { fetchEventDetail } from '../../api/events'
+import { categoryColor } from '../../constants'
 import { timeAgo, CategoryBadge, EventMeta } from './EventUI'
-import type { EventSummary, Article } from '../types'
+import type { EventSummary, Article } from '../../types'
 
 interface EventCardProps {
   event: EventSummary

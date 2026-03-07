@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import L from 'leaflet'
 import { Marker, Popup } from 'react-leaflet'
-import { fetchStaticPoints } from '../api/streams'
-import type { StaticPoint, StaticPointType } from '../types'
+import { fetchStaticPoints } from '../../api/streams'
+import type { StaticPoint, StaticPointType } from '../../types'
 
 const POINT_TYPE_COLOR: Record<StaticPointType, string> = {
   exchange:           '#4fc3f7',
@@ -63,7 +63,7 @@ function StaticPointPopup({ point }: { point: StaticPoint }) {
   const symbol = POINT_TYPE_SYMBOL[type]
   const label = POINT_TYPE_LABEL[type]
   const flag = countryFlag(point.country_code)
-  const m = point.metadata
+  const m = point.metadata as Record<string, unknown>
 
   return (
     <div style={{ fontFamily: 'inherit', minWidth: 200, maxWidth: 260 }}>
@@ -101,26 +101,26 @@ function StaticPointPopup({ point }: { point: StaticPoint }) {
 
       {/* Type-specific metadata */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {(type === 'exchange' || type === 'central_bank') && m.timezone && (
+        {((type === 'exchange' || type === 'central_bank') && m.timezone) ? (
           <MetaRow label="Timezone" value={String(m.timezone)} />
-        )}
-        {type === 'central_bank' && m.currency && (
+        ) : null}
+        {(type === 'central_bank' && m.currency) ? (
           <MetaRow label="Currency" value={String(m.currency)} />
-        )}
-        {(type === 'exchange' || type === 'central_bank') && m.website && (
+        ) : null}
+        {((type === 'exchange' || type === 'central_bank') && m.website) ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: '0.7rem', lineHeight: 1.5 }}>
             <span style={{ color: '#888899' }}>Website</span>
             <a
-              href={`https://${m.website}`}
+              href={`https://${String(m.website) as string}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color, textDecoration: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
               onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
-            >{String(m.website)}</a>
+            >{String(m.website) as string}</a>
           </div>
-        )}
-        {type === 'commodity_exchange' && Array.isArray(m.products) && (
+        ) : null}
+        {(type === 'commodity_exchange' && Array.isArray(m.products)) ? (
           <div>
             <div style={{ fontSize: '0.68rem', color: '#888899', marginBottom: 4 }}>Products</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -132,18 +132,18 @@ function StaticPointPopup({ point }: { point: StaticPoint }) {
               ))}
             </div>
           </div>
-        )}
-        {type === 'port' && (
+        ) : null}
+        {type === 'port' ? (
           <>
-            {m.type && <MetaRow label="Port type" value={String(m.type)} />}
-            {m.teu_rank && <MetaRow label="TEU rank" value={`#${m.teu_rank} globally`} />}
-            {m.note && (
+            {m.type ? <MetaRow label="Port type" value={String(m.type)} /> : null}
+            {m.teu_rank ? <MetaRow label="TEU rank" value={`#${m.teu_rank} globally`} /> : null}
+            {m.note ? (
               <div style={{ fontSize: '0.68rem', color: '#888899', fontStyle: 'italic', marginTop: 2 }}>
                 {String(m.note)}
               </div>
-            )}
+            ) : null}
           </>
-        )}
+        ) : null}
       </div>
     </div>
   )

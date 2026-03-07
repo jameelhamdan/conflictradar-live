@@ -92,7 +92,7 @@ export default function CookieConsent() {
             color: '#7c9ef8', cursor: 'pointer',
           }}
         >
-          Accept analytics
+          Accept cookies
         </button>
       </div>
     </div>
