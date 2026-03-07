@@ -11,13 +11,13 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
-import { categoryColor, categoryIcon } from "../constants";
+import { categoryColor } from "../../constants";
 import { categoryShapeSvg } from "../shapes";
 import { timeAgo, CategoryBadge, EventMeta } from "./EventUI";
 import NotamOverlay from "./NotamOverlay";
 import EarthquakeLayer from "./EarthquakeLayer";
-import { fetchStaticPoints } from "../api/streams";
-import type { EventSummary, StaticPoint, StaticPointType } from "../types";
+import { fetchStaticPoints } from "../../api/streams";
+import type { EventSummary, StaticPoint, StaticPointType } from "../../types";
 
 // --- Static point helpers ---
 const POINT_TYPE_COLOR: Record<StaticPointType, string> = {

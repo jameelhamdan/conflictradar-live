@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { Category } from './types'
+import type { Category } from '../types'
 
 type ShapeProps = { size?: number; color?: string }
 

@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { categoryShapeComponent, CATEGORY_SHAPE } from './shapes'
+import { categoryShapeComponent, CATEGORY_SHAPE } from './components/shapes'
 import type { Category } from './types'
 
 export { categoryShapeComponent, CATEGORY_SHAPE }

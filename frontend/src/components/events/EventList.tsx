@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from 'react'
 import EventCard from './EventCard'
-import type { EventSummary } from '../types'
+import type { EventSummary } from '../../types'
 
 interface EventListProps {
   events: EventSummary[]

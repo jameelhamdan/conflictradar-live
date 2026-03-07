@@ -53,14 +53,7 @@ const LEGEND = [
   { label: "General", color: "#888899", desc: "Other noteworthy events" },
 ];
 
-const NAV_LINK = {
-  color: "#55556a",
-  fontSize: "0.82rem",
-  fontWeight: 500,
-  textDecoration: "none",
-  padding: "0.25rem 0.5rem",
-  borderRadius: 4,
-} as const;
+import SiteHeader from "../components/SiteHeader";
 
 export default function AboutPage() {
   return (
@@ -73,32 +66,7 @@ export default function AboutPage() {
       <meta property="og:title" content="About — conflictradar.live" />
       <meta property="og:description" content="About conflictradar.live — a real-time intelligence platform tracking global conflicts, protests, disasters, and political events using NLP-powered news analysis." />
       <meta property="og:url" content="https://conflictradar.live/about" />
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 2rem",
-          height: 44,
-          background: "#13131c",
-          borderBottom: "1px solid #222230",
-        }}
-      >
-        <a
-          href="/"
-          style={{
-            color: "#55556a",
-            fontSize: "0.82rem",
-            fontWeight: 500,
-            textDecoration: "none",
-          }}
-        >
-          ← Live map
-        </a>
-        <a href="/about" style={{ ...NAV_LINK, color: "#e8e8f0" }}>
-          About
-        </a>
-      </nav>
+      <SiteHeader activePage="about" />
 
       <div
         style={{ maxWidth: 720, margin: "0 auto", padding: "3rem 2rem 5rem" }}

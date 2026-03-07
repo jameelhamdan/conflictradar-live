@@ -1,4 +1,4 @@
-import UnsubscribeClient from '../../../components/UnsubscribeClient'
+import UnsubscribeClient from '../../../components/newsletter/UnsubscribeClient'
 
 export default function UnsubscribePage() {
   return <UnsubscribeClient />

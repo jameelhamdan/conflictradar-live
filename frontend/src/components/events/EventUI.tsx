@@ -1,7 +1,7 @@
 'use client'
 
-import { categoryColor, categoryIcon, intensityColor } from '../constants'
-import type { EventSummary } from '../types'
+import { categoryColor, categoryIcon, intensityColor } from '../../constants'
+import type { EventSummary } from '../../types'
 
 function IntensityBar({ value, compact }: { value: number; compact: boolean }) {
   const color = intensityColor(value)

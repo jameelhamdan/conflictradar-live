@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { CircleMarker, Popup } from 'react-leaflet'
-import { fetchEarthquakes } from '../api/streams'
-import type { EarthquakeRecord } from '../types'
+import { fetchEarthquakes } from '../../api/streams'
+import type { EarthquakeRecord } from '../../types'
 
 const ALERT_COLORS: Record<string, string> = {
   red:    '#e05252',

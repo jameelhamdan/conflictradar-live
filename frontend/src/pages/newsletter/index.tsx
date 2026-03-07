@@ -1,4 +1,4 @@
-import NewsletterPage from "../../components/NewsletterPage";
+import NewsletterPage from "../../components/newsletter/NewsletterPage";
 
 export default function Page() {
   return <NewsletterPage />;

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { fetchPricesLatest } from '../api/streams'
-import type { PriceTick, StreamKey, SSEEvent } from '../types'
+import { fetchPricesLatest } from '../../api/streams'
+import type { PriceTick, StreamKey, SSEEvent } from '../../types'
 
 const STREAM_KEY_LABELS: Record<StreamKey, string> = {
   stock:     'Stocks',

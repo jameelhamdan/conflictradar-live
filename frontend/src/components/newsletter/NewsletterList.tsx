@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchNewsletters } from "../api/newsletter";
-import type { NewsletterSummary } from "../api/newsletter";
+import { fetchNewsletters } from "../../api/newsletter";
+import type { NewsletterSummary } from "../../api/newsletter";
 
 interface Props {
   onSelect: (date: string) => void;
