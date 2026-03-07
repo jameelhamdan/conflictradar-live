@@ -128,6 +128,24 @@ export interface StaticPointsResponse {
   count: number
 }
 
+// --- Newsletter types ---
+
+export interface NewsletterSummary {
+  id: string
+  date: string
+  subject: string
+  sent_at: string | null
+  event_count: number
+  status: string
+}
+
+export interface NewsletterDetail extends NewsletterSummary {
+  html_body: string
+  text_body: string
+  generated_at: string
+  sent_count: number
+}
+
 // SSE event payloads
 export type SSEEvent =
   | { type: 'connected' }

@@ -40,6 +40,8 @@ export default function App() {
   const [filters, setFilters] = useState<EventFilters>({ category: "" });
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"map" | "list">("map");
 
   // Stream layers
   const [showNotams, setShowNotams] = useState(true);
@@ -85,6 +87,12 @@ export default function App() {
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
+    function check() { setIsMobile(window.innerWidth < 768); }
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  useEffect(() => {
     load();
     const timer = setInterval(load, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
@@ -92,6 +100,11 @@ export default function App() {
 
   function clearQuickFilter() {
     setQuickFilter("");
+  }
+
+  function handleSelectEvent(id: string) {
+    setSelectedId(id);
+    if (isMobile) setMobileTab("map");
   }
 
   return (
@@ -121,6 +134,8 @@ export default function App() {
             padding: "0 1rem",
             height: 44,
             borderBottom: "1px solid #1a1a26",
+            overflowX: "auto",
+            scrollbarWidth: "none",
           }}
         >
           <a
@@ -154,28 +169,43 @@ export default function App() {
             </span>
           </a>
 
-          <nav
-            style={{
-              display: "flex",
-              gap: "0.15rem",
-              alignItems: "center",
-              flexShrink: 0,
-            }}
-          >
-            <a
-              href="/about"
+          {!isMobile && (
+            <nav
               style={{
-                color: "#55556a",
-                fontSize: "0.8rem",
-                fontWeight: 500,
-                textDecoration: "none",
-                padding: "0.2rem 0.45rem",
-                borderRadius: 4,
+                display: "flex",
+                gap: "0.15rem",
+                alignItems: "center",
+                flexShrink: 0,
               }}
             >
-              About
-            </a>
-          </nav>
+              <a
+                href="/about"
+                style={{
+                  color: "#55556a",
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  padding: "0.2rem 0.45rem",
+                  borderRadius: 4,
+                }}
+              >
+                About
+              </a>
+              <a
+                href="/newsletter"
+                style={{
+                  color: "#55556a",
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  padding: "0.2rem 0.45rem",
+                  borderRadius: 4,
+                }}
+              >
+                Newsletter
+              </a>
+            </nav>
+          )}
 
           <div
             style={{
@@ -193,6 +223,8 @@ export default function App() {
               alignItems: "center",
               gap: "0.2rem",
               flex: 1,
+              overflowX: "auto",
+              scrollbarWidth: "none",
             }}
           >
             {/* Quick preset buttons */}
@@ -215,6 +247,7 @@ export default function App() {
                     color: active ? "#7c9ef8" : "#55556a",
                     cursor: "pointer",
                     whiteSpace: "nowrap",
+                    flexShrink: 0,
                     transition:
                       "color 0.12s, background 0.12s, border-color 0.12s",
                   }}
@@ -247,7 +280,6 @@ export default function App() {
 
           <span
             style={{
-              marginLeft: "auto",
               fontSize: "0.76rem",
               color: "#44445a",
               whiteSpace: "nowrap",
@@ -303,6 +335,7 @@ export default function App() {
                   color: active ? color : color + "bb",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
+                  flexShrink: 0,
                   transition:
                     "color 0.12s, background 0.12s, border-color 0.12s",
                   letterSpacing: "0.01em",
@@ -319,8 +352,9 @@ export default function App() {
         </div>
       </header>
 
-      <main style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <section style={{ flex: "1 1 60%", minWidth: 0, position: "relative" }}>
+      <main style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
+        {/* Map section — always rendered; on mobile fills the full main area */}
+        <section style={{ flex: isMobile ? "1 1 auto" : "1 1 60%", minWidth: 0, position: "relative" }}>
           {mounted && (
             <Suspense
               fallback={
@@ -330,7 +364,7 @@ export default function App() {
               <MapView
                 events={events}
                 selectedId={selectedId}
-                onSelectEvent={setSelectedId}
+                onSelectEvent={handleSelectEvent}
                 streamRefresh={streamRefresh}
                 showNotams={showNotams}
                 showEarthquakes={showEarthquakes}
@@ -339,47 +373,61 @@ export default function App() {
             </Suspense>
           )}
 
-          {/* Layer toggles — bottom-left corner over map */}
-          <div style={{
-            position: "absolute",
-            bottom: 28,
-            left: 10,
-            zIndex: 1000,
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.25rem",
-          }}>
-            {([
-              { key: "notams",        label: "NOTAMs",      color: "#ff6644", value: showNotams,        set: setShowNotams },
-              { key: "earthquakes",   label: "Earthquakes",  color: "#7c6ef8", value: showEarthquakes,   set: setShowEarthquakes },
-              { key: "staticPoints",  label: "Locations",    color: "#4fc3f7", value: showStaticPoints,  set: setShowStaticPoints },
-            ] as const).map(({ key, label, color, value, set }) => (
-              <button
-                key={key}
-                onClick={() => set((v) => !v)}
-                style={{
-                  fontSize: "0.7rem",
-                  fontWeight: value ? 600 : 400,
-                  padding: "0.2rem 0.55rem",
-                  borderRadius: 99,
-                  border: `1px solid ${value ? color + "66" : "#2a2a3a"}`,
-                  background: value ? color + "22" : "#0d0d1488",
-                  color: value ? color : "#44445a",
-                  cursor: "pointer",
-                  backdropFilter: "blur(4px)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Layer toggles — hidden on mobile when list tab is active */}
+          {(!isMobile || mobileTab === "map") && (
+            <div style={{
+              position: "absolute",
+              bottom: isMobile ? 16 : 28,
+              left: 10,
+              zIndex: 1000,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.25rem",
+            }}>
+              {([
+                { key: "notams",       label: "NOTAMs",     color: "#ff6644", value: showNotams,       set: setShowNotams },
+                { key: "earthquakes",  label: "Earthquakes", color: "#7c6ef8", value: showEarthquakes,  set: setShowEarthquakes },
+                { key: "staticPoints", label: "Locations",   color: "#4fc3f7", value: showStaticPoints, set: setShowStaticPoints },
+              ] as const).map(({ key, label, color, value, set }) => (
+                <button
+                  key={key}
+                  onClick={() => set((v) => !v)}
+                  style={{
+                    fontSize: "0.7rem",
+                    fontWeight: value ? 600 : 400,
+                    padding: "0.2rem 0.55rem",
+                    borderRadius: 99,
+                    border: `1px solid ${value ? color + "66" : "#2a2a3a"}`,
+                    background: value ? color + "22" : "#0d0d1488",
+                    color: value ? color : "#44445a",
+                    cursor: "pointer",
+                    backdropFilter: "blur(4px)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
+
+        {/* List panel — fixed sidebar on desktop; full overlay on mobile */}
         <section
           style={{
-            flex: "0 0 380px",
+            ...(isMobile
+              ? {
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 500,
+                  display: mobileTab === "list" ? "flex" : "none",
+                  flexDirection: "column",
+                }
+              : {
+                  flex: "0 0 380px",
+                  borderLeft: "1px solid #1e1e2a",
+                }),
             overflowY: "auto",
-            borderLeft: "1px solid #1e1e2a",
             background: "#0d0d14",
           }}
         >
@@ -387,20 +435,106 @@ export default function App() {
           <EventList
             events={events}
             selectedId={selectedId}
-            onSelectEvent={setSelectedId}
+            onSelectEvent={handleSelectEvent}
           />
-          <div style={{
-            padding: '0.85rem 1rem',
-            borderTop: '1px solid #1a1a26',
-            display: 'flex', gap: '1rem', flexWrap: 'wrap',
-            fontSize: '0.72rem', color: '#33334a',
-          }}>
-            <a href="/terms" style={{ color: '#33334a', textDecoration: 'none' }}>Terms</a>
-            <a href="/privacy" style={{ color: '#33334a', textDecoration: 'none' }}>Privacy</a>
-            <a href="/about" style={{ color: '#33334a', textDecoration: 'none' }}>About</a>
+          <div
+            style={{
+              padding: "0.85rem 1rem",
+              borderTop: "1px solid #1a1a26",
+            }}
+          >
+            <div
+              style={{
+                marginTop: "0.1rem",
+                display: "flex",
+                gap: "1rem",
+                flexWrap: "wrap",
+                fontSize: "0.72rem",
+                color: "#33334a",
+              }}
+            >
+              <a href="/newsletter" style={{ color: "#7c9ef8", textDecoration: "none" }}>
+                Daily Briefing
+              </a>
+              <a href="/terms" style={{ color: "#33334a", textDecoration: "none" }}>
+                Terms
+              </a>
+              <a href="/privacy" style={{ color: "#33334a", textDecoration: "none" }}>
+                Privacy
+              </a>
+              <a href="/about" style={{ color: "#33334a", textDecoration: "none" }}>
+                About
+              </a>
+            </div>
           </div>
         </section>
       </main>
+
+      {/* Mobile bottom tab bar */}
+      {isMobile && (
+        <nav
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            height: 52,
+            background: "#13131c",
+            borderTop: "1px solid #1e1e2a",
+          }}
+        >
+          {(["map", "list"] as const).map((tab) => {
+            const active = mobileTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => { setMobileTab(tab); setSection("map"); }}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.15rem",
+                  background: "none",
+                  border: "none",
+                  borderTop: `2px solid ${active ? "#7c9ef8" : "transparent"}`,
+                  color: active ? "#7c9ef8" : "#44445a",
+                  fontSize: "0.7rem",
+                  fontWeight: active ? 600 : 400,
+                  cursor: "pointer",
+                  transition: "color 0.12s",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>
+                  {tab === "map" ? "⬡" : "☰"}
+                </span>
+                {tab === "map" ? "Map" : `Events${events.length ? ` (${events.length})` : ""}`}
+              </button>
+            );
+          })}
+          <a
+            href="/newsletter"
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.15rem",
+              background: "none",
+              border: "none",
+              borderTop: "2px solid transparent",
+              color: "#44445a",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              textDecoration: "none",
+            }}
+          >
+            <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>✉</span>
+            Briefings
+          </a>
+        </nav>
+      )}
     </div>
   );
 }

@@ -1,32 +1,27 @@
-"""
-REST API views for the live event map frontend.
-
-Endpoints:
-  GET /api/events/              — list events with optional filters
-  GET /api/events/<id>/         — single event with its articles
-  GET /api/sources/             — list configured sources
-  GET /api/prices/latest/       — latest price tick per symbol
-  GET /api/prices/<symbol>/     — price history for one symbol
-  GET /api/notams/              — active NOTAM zones (GeoJSON)
-  GET /api/notams/history/      — NOTAM alert history
-  GET /api/earthquakes/         — recent earthquake records
-  GET /api/static-points/       — static reference points (exchanges, ports, etc.)
-  GET /api/sse/                 — Server-Sent Events stream
-"""
+"""API views — events, sources, prices, NOTAMs, earthquakes, static points, SSE."""
 import asyncio
+import hashlib
+import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
 
 import redis.asyncio as aioredis
+from django.core.cache import caches
 from django.http import StreamingHttpResponse
 from django.views import View
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+_CACHE_TTL = 30  # seconds
+
+
+def _redis_cache():
+    return caches['redis-cache']
 
 from core import models as core_models
-from .serializers import (
+from api.serializers import (
     ArticleSerializer, EventSerializer, SourceSerializer,
     PriceTickSerializer, NotamZoneSerializer, NotamRecordSerializer,
     EarthquakeRecordSerializer, StaticPointSerializer,
@@ -34,11 +29,6 @@ from .serializers import (
 
 
 def _parse_dt(value: str) -> datetime:
-    """Parse an ISO datetime string and ensure it is UTC-aware.
-
-    .replace() would silently overwrite an existing timezone on tz-aware strings;
-    .astimezone() converts correctly in both cases.
-    """
     dt = datetime.fromisoformat(value)
     if dt.tzinfo is None:
         return dt.replace(tzinfo=dt_timezone.utc)
@@ -56,16 +46,16 @@ def _parse_int(value: str | None, default: int, max_value: int | None = None) ->
 class EventListView(APIView):
     """
     GET /api/events/
-
-    Query params:
-      category  — filter by category slug (e.g. conflict)
-      start     — ISO datetime lower bound for started_at
-      end       — ISO datetime upper bound for started_at
-      limit     — max results (default 100, max 500)
-      bbox      — comma-separated lat_min,lng_min,lat_max,lng_max
+    Query params: category, start, end, limit (max 500), bbox (lat_min,lng_min,lat_max,lng_max)
     """
 
     def get(self, request):
+        params = dict(sorted(request.query_params.items()))
+        cache_key = 'api:events:list:' + hashlib.md5(json.dumps(params).encode()).hexdigest()
+        cache = _redis_cache()
+        if (cached := cache.get(cache_key)) is not None:
+            return Response(cached)
+
         qs = core_models.Event.objects.all()
 
         if category := request.query_params.get('category'):
@@ -97,24 +87,26 @@ class EventListView(APIView):
                 )
 
         limit = _parse_int(request.query_params.get('limit'), 100, 500)
-        serializer = EventSerializer(qs[:limit], many=True)
-        return Response({'results': serializer.data, 'count': len(serializer.data)})
+        data = {'results': EventSerializer(qs[:limit], many=True).data}
+        data['count'] = len(data['results'])
+        cache.set(cache_key, data, _CACHE_TTL)
+        return Response(data)
 
 
 class EventDetailView(APIView):
-    """
-    GET /api/events/<id>/
-
-    Returns the event plus its full article list.
-    """
+    """GET /api/events/<id>/"""
 
     def get(self, request, event_id):
+        cache_key = f'api:events:detail:{event_id}'
+        cache = _redis_cache()
+        if (cached := cache.get(cache_key)) is not None:
+            return Response(cached)
+
         try:
             event = core_models.Event.objects.get(pk=event_id)
         except core_models.Event.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # article_ids are stored as strings; convert to UUIDs for the ORM filter
         article_uuids = []
         for raw_id in event.article_ids:
             try:
@@ -123,9 +115,9 @@ class EventDetailView(APIView):
                 pass
 
         articles = core_models.Article.objects.filter(id__in=article_uuids)
-
         data = EventSerializer(event).data
         data['articles'] = ArticleSerializer(articles, many=True).data
+        cache.set(cache_key, data, _CACHE_TTL)
         return Response(data)
 
 
@@ -133,27 +125,23 @@ class SourceListView(APIView):
     """GET /api/sources/"""
 
     def get(self, request):
-        sources = core_models.Source.objects.all()
-        serializer = SourceSerializer(sources, many=True)
-        return Response({'results': serializer.data})
+        cache = _redis_cache()
+        if (cached := cache.get('api:sources:list')) is not None:
+            return Response(cached)
+        data = {'results': SourceSerializer(core_models.Source.objects.all(), many=True).data}
+        cache.set('api:sources:list', data, _CACHE_TTL)
+        return Response(data)
 
 
 class PriceLatestView(APIView):
-    """
-    GET /api/prices/latest/
-
-    Returns the most recent price tick for every known symbol, grouped by stream_key.
-    Query params:
-      stream_key — filter by category ("stock", "crypto", "commodity", "forex", "bond")
-    """
+    """GET /api/prices/latest/ — most recent tick per symbol; query param: stream_key"""
 
     def get(self, request):
         qs = core_models.PriceTick.objects.all()
         if stream_key := request.query_params.get('stream_key'):
             qs = qs.filter(stream_key=stream_key)
 
-        # Collect latest tick per symbol (queryset is ordered by -occurred_at)
-        seen = set()
+        seen: set = set()
         latest = []
         for tick in qs:
             if tick.symbol not in seen:
@@ -162,56 +150,37 @@ class PriceLatestView(APIView):
             if len(seen) > 200:
                 break
 
-        serializer = PriceTickSerializer(latest, many=True)
-        return Response({'results': serializer.data})
+        return Response({'results': PriceTickSerializer(latest, many=True).data})
 
 
 class PriceHistoryView(APIView):
-    """
-    GET /api/prices/<symbol>/
-
-    Returns price history for one symbol.
-    Query params:
-      from    — ISO datetime lower bound (default: 24h ago)
-      to      — ISO datetime upper bound (default: now)
-      limit   — max records (default 500, max 5000)
-    """
+    """GET /api/prices/<symbol>/ — query params: from, to, limit (max 5000)"""
 
     def get(self, request, symbol):
         qs = core_models.PriceTick.objects.filter(symbol=symbol)
-
         now = datetime.now(tz=dt_timezone.utc)
+
         try:
-            start = _parse_dt(raw_from) if (raw_from := request.query_params.get('from')) else now - timedelta(hours=24)
+            start = _parse_dt(raw) if (raw := request.query_params.get('from')) else now - timedelta(hours=24)
         except ValueError:
             return Response({'error': 'Invalid from date'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            end = _parse_dt(raw_to) if (raw_to := request.query_params.get('to')) else now
+            end = _parse_dt(raw) if (raw := request.query_params.get('to')) else now
         except ValueError:
             return Response({'error': 'Invalid to date'}, status=status.HTTP_400_BAD_REQUEST)
 
         qs = qs.filter(occurred_at__gte=start, occurred_at__lte=end)
         limit = _parse_int(request.query_params.get('limit'), 500, 5000)
-
         serializer = PriceTickSerializer(qs[:limit], many=True)
         return Response({'symbol': symbol, 'results': serializer.data, 'count': len(serializer.data)})
 
 
 class NotamZoneListView(APIView):
-    """
-    GET /api/notams/
-
-    Returns current active NOTAM zones (is_active=True by default).
-    Query params:
-      active         — "true" (default) or "false" or "all"
-      country_code   — filter by 2-letter ICAO country code
-      notam_type     — filter by type (TFR, prohibited, restricted, danger, ...)
-    """
+    """GET /api/notams/ — query params: active (true/false/all), country_code, notam_type"""
 
     def get(self, request):
         qs = core_models.NotamZone.objects.all()
-
         active_param = request.query_params.get('active', 'true').lower()
         if active_param == 'true':
             qs = qs.filter(is_active=True)
@@ -220,7 +189,6 @@ class NotamZoneListView(APIView):
 
         if country_code := request.query_params.get('country_code'):
             qs = qs.filter(country_code__iexact=country_code)
-
         if notam_type := request.query_params.get('notam_type'):
             qs = qs.filter(notam_type__iexact=notam_type)
 
@@ -229,20 +197,13 @@ class NotamZoneListView(APIView):
 
 
 class NotamHistoryView(APIView):
-    """
-    GET /api/notams/history/
-
-    Returns NOTAM alert history.
-    Query params:
-      from, to, country_code, status, limit
-    """
+    """GET /api/notams/history/ — query params: from, to, country_code, status, limit"""
 
     def get(self, request):
         qs = core_models.NotamRecord.objects.all()
 
         if country_code := request.query_params.get('country_code'):
             qs = qs.filter(country_code__iexact=country_code)
-
         if notam_status := request.query_params.get('status'):
             qs = qs.filter(status=notam_status)
 
@@ -259,20 +220,12 @@ class NotamHistoryView(APIView):
                 return Response({'error': 'Invalid to date'}, status=status.HTTP_400_BAD_REQUEST)
 
         limit = _parse_int(request.query_params.get('limit'), 200, 2000)
-
         serializer = NotamRecordSerializer(qs[:limit], many=True)
         return Response({'results': serializer.data, 'count': len(serializer.data)})
 
 
 class EarthquakeListView(APIView):
-    """
-    GET /api/earthquakes/
-
-    Query params:
-      min_magnitude  — float (default 3.0)
-      hours          — look back N hours (default 24)
-      limit          — max records (default 200, max 2000)
-    """
+    """GET /api/earthquakes/ — query params: min_magnitude, hours, limit"""
 
     def get(self, request):
         try:
@@ -282,32 +235,24 @@ class EarthquakeListView(APIView):
 
         hours = _parse_int(request.query_params.get('hours'), 24)
         limit = _parse_int(request.query_params.get('limit'), 200, 2000)
-
         cutoff = datetime.now(tz=dt_timezone.utc) - timedelta(hours=hours)
+
         qs = core_models.EarthquakeRecord.objects.filter(
             magnitude__gte=min_mag,
             occurred_at__gte=cutoff,
         )
-
         serializer = EarthquakeRecordSerializer(qs[:limit], many=True)
         return Response({'results': serializer.data, 'count': len(serializer.data)})
 
 
 class StaticPointListView(APIView):
-    """
-    GET /api/static-points/
-
-    Query params:
-      type          — point_type slug (exchange, commodity_exchange, port, central_bank)
-      country_code  — ISO 2-letter code
-    """
+    """GET /api/static-points/ — query params: type, country_code"""
 
     def get(self, request):
         qs = core_models.StaticPoint.objects.filter(is_active=True)
 
         if point_type := request.query_params.get('type'):
             qs = qs.filter(point_type=point_type)
-
         if country_code := request.query_params.get('country_code'):
             qs = qs.filter(country_code__iexact=country_code)
 
@@ -316,16 +261,7 @@ class StaticPointListView(APIView):
 
 
 class SSEStreamView(View):
-    """
-    GET /api/sse/
-
-    Async Server-Sent Events endpoint. Each connection holds an async task
-    subscribed to Redis pub/sub — no thread pool slots are consumed.
-
-    Frontend connects via:
-        const es = new EventSource('/api/sse/');
-        es.onmessage = (e) => { const data = JSON.parse(e.data); ... };
-    """
+    """GET /api/sse/ — async Server-Sent Events from Redis pub/sub"""
 
     SSE_CHANNELS = ('sse:stream', 'sse:prices', 'sse:notams', 'sse:earthquakes')
 
@@ -349,10 +285,7 @@ class SSEStreamView(View):
                 await pubsub.unsubscribe(*self.SSE_CHANNELS)
                 await r.aclose()
 
-        response = StreamingHttpResponse(
-            event_stream(),
-            content_type='text/event-stream',
-        )
+        response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
         response['Cache-Control'] = 'no-cache'
         response['X-Accel-Buffering'] = 'no'
         response['Access-Control-Allow-Origin'] = '*'

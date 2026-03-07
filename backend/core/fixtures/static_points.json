@@ -1,0 +1,957 @@
+[
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "NYSE",
+      "point_type": "exchange",
+      "name": "New York Stock Exchange",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 40.7069,
+      "longitude": -74.0089,
+      "metadata": {"timezone": "America/New_York", "website": "https://www.nyse.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "NASDAQ",
+      "point_type": "exchange",
+      "name": "NASDAQ",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 40.7580,
+      "longitude": -73.9855,
+      "metadata": {"timezone": "America/New_York", "website": "https://www.nasdaq.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "LSE",
+      "point_type": "exchange",
+      "name": "London Stock Exchange",
+      "country": "United Kingdom",
+      "country_code": "GB",
+      "latitude": 51.5156,
+      "longitude": -0.0976,
+      "metadata": {"timezone": "Europe/London", "website": "https://www.londonstockexchange.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "TSE",
+      "point_type": "exchange",
+      "name": "Tokyo Stock Exchange",
+      "country": "Japan",
+      "country_code": "JP",
+      "latitude": 35.6838,
+      "longitude": 139.7750,
+      "metadata": {"timezone": "Asia/Tokyo", "website": "https://www.jpx.co.jp"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "SSE",
+      "point_type": "exchange",
+      "name": "Shanghai Stock Exchange",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 31.2304,
+      "longitude": 121.4737,
+      "metadata": {"timezone": "Asia/Shanghai", "website": "http://www.sse.com.cn"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "HKEX",
+      "point_type": "exchange",
+      "name": "Hong Kong Stock Exchange",
+      "country": "Hong Kong",
+      "country_code": "HK",
+      "latitude": 22.2819,
+      "longitude": 114.1579,
+      "metadata": {"timezone": "Asia/Hong_Kong", "website": "https://www.hkex.com.hk"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "XETRA",
+      "point_type": "exchange",
+      "name": "Frankfurt Stock Exchange (XETRA)",
+      "country": "Germany",
+      "country_code": "DE",
+      "latitude": 50.1155,
+      "longitude": 8.6742,
+      "metadata": {"timezone": "Europe/Berlin", "website": "https://www.boerse-frankfurt.de"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "EURONEXT-PAR",
+      "point_type": "exchange",
+      "name": "Euronext Paris",
+      "country": "France",
+      "country_code": "FR",
+      "latitude": 48.8734,
+      "longitude": 2.3484,
+      "metadata": {"timezone": "Europe/Paris", "website": "https://www.euronext.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "TSX",
+      "point_type": "exchange",
+      "name": "Toronto Stock Exchange",
+      "country": "Canada",
+      "country_code": "CA",
+      "latitude": 43.6479,
+      "longitude": -79.3820,
+      "metadata": {"timezone": "America/Toronto", "website": "https://www.tsx.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BSE",
+      "point_type": "exchange",
+      "name": "Bombay Stock Exchange",
+      "country": "India",
+      "country_code": "IN",
+      "latitude": 18.9354,
+      "longitude": 72.8374,
+      "metadata": {"timezone": "Asia/Kolkata", "website": "https://www.bseindia.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "SGX",
+      "point_type": "exchange",
+      "name": "Singapore Exchange",
+      "country": "Singapore",
+      "country_code": "SG",
+      "latitude": 1.2789,
+      "longitude": 103.8536,
+      "metadata": {"timezone": "Asia/Singapore", "website": "https://www.sgx.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "KRX",
+      "point_type": "exchange",
+      "name": "Korea Stock Exchange",
+      "country": "South Korea",
+      "country_code": "KR",
+      "latitude": 37.5665,
+      "longitude": 126.9780,
+      "metadata": {"timezone": "Asia/Seoul", "website": "https://www.krx.co.kr"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "SIX",
+      "point_type": "exchange",
+      "name": "SIX Swiss Exchange",
+      "country": "Switzerland",
+      "country_code": "CH",
+      "latitude": 47.3748,
+      "longitude": 8.5373,
+      "metadata": {"timezone": "Europe/Zurich", "website": "https://www.six-group.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "MOEX",
+      "point_type": "exchange",
+      "name": "Moscow Exchange",
+      "country": "Russia",
+      "country_code": "RU",
+      "latitude": 55.7558,
+      "longitude": 37.6176,
+      "metadata": {"timezone": "Europe/Moscow", "website": "https://www.moex.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "ASX",
+      "point_type": "exchange",
+      "name": "Australian Securities Exchange",
+      "country": "Australia",
+      "country_code": "AU",
+      "latitude": -33.8737,
+      "longitude": 151.2106,
+      "metadata": {"timezone": "Australia/Sydney", "website": "https://www.asx.com.au"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "DFM",
+      "point_type": "exchange",
+      "name": "Dubai Financial Market",
+      "country": "United Arab Emirates",
+      "country_code": "AE",
+      "latitude": 25.2048,
+      "longitude": 55.2708,
+      "metadata": {"timezone": "Asia/Dubai", "website": "https://www.dfm.ae"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "JSE",
+      "point_type": "exchange",
+      "name": "Johannesburg Stock Exchange",
+      "country": "South Africa",
+      "country_code": "ZA",
+      "latitude": -26.2041,
+      "longitude": 28.0473,
+      "metadata": {"timezone": "Africa/Johannesburg", "website": "https://www.jse.co.za"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "B3",
+      "point_type": "exchange",
+      "name": "B3 — Brasil Bolsa Balcão",
+      "country": "Brazil",
+      "country_code": "BR",
+      "latitude": -23.5505,
+      "longitude": -46.6333,
+      "metadata": {"timezone": "America/Sao_Paulo", "website": "https://www.b3.com.br"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "TADAWUL",
+      "point_type": "exchange",
+      "name": "Saudi Exchange (Tadawul)",
+      "country": "Saudi Arabia",
+      "country_code": "SA",
+      "latitude": 24.6877,
+      "longitude": 46.6835,
+      "metadata": {"timezone": "Asia/Riyadh", "website": "https://www.saudiexchange.sa"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BIST",
+      "point_type": "exchange",
+      "name": "Borsa Istanbul",
+      "country": "Turkey",
+      "country_code": "TR",
+      "latitude": 41.0082,
+      "longitude": 28.9784,
+      "metadata": {"timezone": "Europe/Istanbul", "website": "https://www.borsaistanbul.com"},
+      "is_active": true
+    }
+  },
+
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "CME",
+      "point_type": "commodity_exchange",
+      "name": "CME Group",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 41.8781,
+      "longitude": -87.6298,
+      "metadata": {"timezone": "America/Chicago", "website": "https://www.cmegroup.com", "products": ["futures", "options", "grains", "livestock", "energy", "metals"]},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "NYMEX",
+      "point_type": "commodity_exchange",
+      "name": "New York Mercantile Exchange",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 40.7069,
+      "longitude": -74.0089,
+      "metadata": {"timezone": "America/New_York", "website": "https://www.cmegroup.com/markets/energy.html", "products": ["crude oil", "natural gas", "gold", "silver"]},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "LME",
+      "point_type": "commodity_exchange",
+      "name": "London Metal Exchange",
+      "country": "United Kingdom",
+      "country_code": "GB",
+      "latitude": 51.5156,
+      "longitude": -0.0976,
+      "metadata": {"timezone": "Europe/London", "website": "https://www.lme.com", "products": ["copper", "aluminum", "zinc", "lead", "nickel", "tin"]},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "ICE-LON",
+      "point_type": "commodity_exchange",
+      "name": "ICE Futures Europe",
+      "country": "United Kingdom",
+      "country_code": "GB",
+      "latitude": 51.5195,
+      "longitude": -0.0858,
+      "metadata": {"timezone": "Europe/London", "website": "https://www.theice.com", "products": ["brent crude", "gasoil", "natural gas", "power"]},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "DCE",
+      "point_type": "commodity_exchange",
+      "name": "Dalian Commodity Exchange",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 38.9140,
+      "longitude": 121.6147,
+      "metadata": {"timezone": "Asia/Shanghai", "website": "http://www.dce.com.cn", "products": ["iron ore", "soy", "corn", "palm oil", "LLDPE"]},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "SHFE",
+      "point_type": "commodity_exchange",
+      "name": "Shanghai Futures Exchange",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 31.2304,
+      "longitude": 121.4737,
+      "metadata": {"timezone": "Asia/Shanghai", "website": "http://www.shfe.com.cn", "products": ["copper", "aluminum", "zinc", "gold", "silver", "crude oil", "rubber"]},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "TOCOM",
+      "point_type": "commodity_exchange",
+      "name": "Tokyo Commodity Exchange",
+      "country": "Japan",
+      "country_code": "JP",
+      "latitude": 35.6762,
+      "longitude": 139.6503,
+      "metadata": {"timezone": "Asia/Tokyo", "website": "https://www.jpx.co.jp/english/derivatives/commodity", "products": ["rubber", "gold", "silver", "platinum", "crude oil"]},
+      "is_active": true
+    }
+  },
+
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-ROTTERDAM",
+      "point_type": "port",
+      "name": "Port of Rotterdam",
+      "country": "Netherlands",
+      "country_code": "NL",
+      "latitude": 51.9244,
+      "longitude": 4.4777,
+      "metadata": {"annual_teu": 14800000, "website": "https://www.portofrotterdam.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-SINGAPORE",
+      "point_type": "port",
+      "name": "Port of Singapore",
+      "country": "Singapore",
+      "country_code": "SG",
+      "latitude": 1.2655,
+      "longitude": 103.8196,
+      "metadata": {"annual_teu": 37200000, "website": "https://www.mpa.gov.sg"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-SHANGHAI",
+      "point_type": "port",
+      "name": "Port of Shanghai",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 31.1827,
+      "longitude": 121.6517,
+      "metadata": {"annual_teu": 47300000, "website": "http://www.portshanghai.com.cn"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-SHENZHEN",
+      "point_type": "port",
+      "name": "Port of Shenzhen",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 22.5431,
+      "longitude": 114.0579,
+      "metadata": {"annual_teu": 28700000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-HONGKONG",
+      "point_type": "port",
+      "name": "Port of Hong Kong",
+      "country": "Hong Kong",
+      "country_code": "HK",
+      "latitude": 22.3193,
+      "longitude": 114.1694,
+      "metadata": {"annual_teu": 17800000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-NINGBO",
+      "point_type": "port",
+      "name": "Port of Ningbo-Zhoushan",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 29.8683,
+      "longitude": 121.5440,
+      "metadata": {"annual_teu": 33400000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-BUSAN",
+      "point_type": "port",
+      "name": "Port of Busan",
+      "country": "South Korea",
+      "country_code": "KR",
+      "latitude": 35.0996,
+      "longitude": 129.0434,
+      "metadata": {"annual_teu": 21500000, "website": "https://www.busanpa.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-JEBEL-ALI",
+      "point_type": "port",
+      "name": "Port of Jebel Ali",
+      "country": "United Arab Emirates",
+      "country_code": "AE",
+      "latitude": 24.9974,
+      "longitude": 55.0601,
+      "metadata": {"annual_teu": 13600000, "website": "https://www.dpworld.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-LA",
+      "point_type": "port",
+      "name": "Port of Los Angeles",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 33.7361,
+      "longitude": -118.2809,
+      "metadata": {"annual_teu": 9200000, "website": "https://www.portoflosangeles.org"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-HAMBURG",
+      "point_type": "port",
+      "name": "Port of Hamburg",
+      "country": "Germany",
+      "country_code": "DE",
+      "latitude": 53.5753,
+      "longitude": 9.9556,
+      "metadata": {"annual_teu": 8900000, "website": "https://www.hafen-hamburg.de"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-ANTWERP",
+      "point_type": "port",
+      "name": "Port of Antwerp-Bruges",
+      "country": "Belgium",
+      "country_code": "BE",
+      "latitude": 51.2993,
+      "longitude": 4.3775,
+      "metadata": {"annual_teu": 12800000, "website": "https://www.portofantwerpbruges.com"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-NY",
+      "point_type": "port",
+      "name": "Port of New York and New Jersey",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 40.6501,
+      "longitude": -74.1599,
+      "metadata": {"annual_teu": 9200000, "website": "https://www.panynj.gov"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-GUANGZHOU",
+      "point_type": "port",
+      "name": "Port of Guangzhou",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 23.1291,
+      "longitude": 113.2644,
+      "metadata": {"annual_teu": 24200000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-KAOHSIUNG",
+      "point_type": "port",
+      "name": "Port of Kaohsiung",
+      "country": "Taiwan",
+      "country_code": "TW",
+      "latitude": 22.6175,
+      "longitude": 120.3048,
+      "metadata": {"annual_teu": 9700000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-SANTOS",
+      "point_type": "port",
+      "name": "Port of Santos",
+      "country": "Brazil",
+      "country_code": "BR",
+      "latitude": -23.9535,
+      "longitude": -46.3333,
+      "metadata": {"annual_teu": 4500000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-DURBAN",
+      "point_type": "port",
+      "name": "Port of Durban",
+      "country": "South Africa",
+      "country_code": "ZA",
+      "latitude": -29.8587,
+      "longitude": 31.0218,
+      "metadata": {"annual_teu": 2900000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-MUMBAI",
+      "point_type": "port",
+      "name": "Jawaharlal Nehru Port (Mumbai)",
+      "country": "India",
+      "country_code": "IN",
+      "latitude": 18.9220,
+      "longitude": 72.8347,
+      "metadata": {"annual_teu": 5800000},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-FELIXSTOWE",
+      "point_type": "port",
+      "name": "Port of Felixstowe",
+      "country": "United Kingdom",
+      "country_code": "GB",
+      "latitude": 51.9650,
+      "longitude": 1.3520,
+      "metadata": {"annual_teu": 3800000, "website": "https://www.portoffelixstowe.co.uk"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-SUEZ",
+      "point_type": "port",
+      "name": "Port Said (Suez Canal)",
+      "country": "Egypt",
+      "country_code": "EG",
+      "latitude": 31.2605,
+      "longitude": 32.3063,
+      "metadata": {"note": "Northern entrance to the Suez Canal"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PORT-COLOMBO",
+      "point_type": "port",
+      "name": "Port of Colombo",
+      "country": "Sri Lanka",
+      "country_code": "LK",
+      "latitude": 6.9271,
+      "longitude": 79.8612,
+      "metadata": {"annual_teu": 6600000},
+      "is_active": true
+    }
+  },
+
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "FED",
+      "point_type": "central_bank",
+      "name": "Federal Reserve",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 38.8951,
+      "longitude": -77.0364,
+      "metadata": {"currency": "USD", "website": "https://www.federalreserve.gov"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "ECB",
+      "point_type": "central_bank",
+      "name": "European Central Bank",
+      "country": "Germany",
+      "country_code": "DE",
+      "latitude": 50.1109,
+      "longitude": 8.7021,
+      "metadata": {"currency": "EUR", "website": "https://www.ecb.europa.eu"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BOE",
+      "point_type": "central_bank",
+      "name": "Bank of England",
+      "country": "United Kingdom",
+      "country_code": "GB",
+      "latitude": 51.5156,
+      "longitude": -0.0879,
+      "metadata": {"currency": "GBP", "website": "https://www.bankofengland.co.uk"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BOJ",
+      "point_type": "central_bank",
+      "name": "Bank of Japan",
+      "country": "Japan",
+      "country_code": "JP",
+      "latitude": 35.6895,
+      "longitude": 139.6917,
+      "metadata": {"currency": "JPY", "website": "https://www.boj.or.jp"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "PBOC",
+      "point_type": "central_bank",
+      "name": "People's Bank of China",
+      "country": "China",
+      "country_code": "CN",
+      "latitude": 39.9042,
+      "longitude": 116.4074,
+      "metadata": {"currency": "CNY", "website": "http://www.pbc.gov.cn"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "RBA",
+      "point_type": "central_bank",
+      "name": "Reserve Bank of Australia",
+      "country": "Australia",
+      "country_code": "AU",
+      "latitude": -33.8688,
+      "longitude": 151.2093,
+      "metadata": {"currency": "AUD", "website": "https://www.rba.gov.au"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "SNB",
+      "point_type": "central_bank",
+      "name": "Swiss National Bank",
+      "country": "Switzerland",
+      "country_code": "CH",
+      "latitude": 46.9480,
+      "longitude": 7.4474,
+      "metadata": {"currency": "CHF", "website": "https://www.snb.ch"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BOC",
+      "point_type": "central_bank",
+      "name": "Bank of Canada",
+      "country": "Canada",
+      "country_code": "CA",
+      "latitude": 45.4215,
+      "longitude": -75.7002,
+      "metadata": {"currency": "CAD", "website": "https://www.bankofcanada.ca"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "RBI",
+      "point_type": "central_bank",
+      "name": "Reserve Bank of India",
+      "country": "India",
+      "country_code": "IN",
+      "latitude": 18.9256,
+      "longitude": 72.8332,
+      "metadata": {"currency": "INR", "website": "https://www.rbi.org.in"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "CBR",
+      "point_type": "central_bank",
+      "name": "Bank of Russia",
+      "country": "Russia",
+      "country_code": "RU",
+      "latitude": 55.7558,
+      "longitude": 37.6176,
+      "metadata": {"currency": "RUB", "website": "https://www.cbr.ru"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BCB",
+      "point_type": "central_bank",
+      "name": "Banco Central do Brasil",
+      "country": "Brazil",
+      "country_code": "BR",
+      "latitude": -15.7801,
+      "longitude": -47.9292,
+      "metadata": {"currency": "BRL", "website": "https://www.bcb.gov.br"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "SARB",
+      "point_type": "central_bank",
+      "name": "South African Reserve Bank",
+      "country": "South Africa",
+      "country_code": "ZA",
+      "latitude": -25.7479,
+      "longitude": 28.2293,
+      "metadata": {"currency": "ZAR", "website": "https://www.resbank.co.za"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BOK",
+      "point_type": "central_bank",
+      "name": "Bank of Korea",
+      "country": "South Korea",
+      "country_code": "KR",
+      "latitude": 37.4979,
+      "longitude": 127.0276,
+      "metadata": {"currency": "KRW", "website": "https://www.bok.or.kr"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "MAS",
+      "point_type": "central_bank",
+      "name": "Monetary Authority of Singapore",
+      "country": "Singapore",
+      "country_code": "SG",
+      "latitude": 1.2789,
+      "longitude": 103.8536,
+      "metadata": {"currency": "SGD", "website": "https://www.mas.gov.sg"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "SAMA",
+      "point_type": "central_bank",
+      "name": "Saudi Central Bank (SAMA)",
+      "country": "Saudi Arabia",
+      "country_code": "SA",
+      "latitude": 24.6877,
+      "longitude": 46.6835,
+      "metadata": {"currency": "SAR", "website": "https://www.sama.gov.sa"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BANXICO",
+      "point_type": "central_bank",
+      "name": "Banco de México",
+      "country": "Mexico",
+      "country_code": "MX",
+      "latitude": 19.4326,
+      "longitude": -99.1332,
+      "metadata": {"currency": "MXN", "website": "https://www.banxico.org.mx"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "TCMB",
+      "point_type": "central_bank",
+      "name": "Central Bank of the Republic of Turkey",
+      "country": "Turkey",
+      "country_code": "TR",
+      "latitude": 39.9334,
+      "longitude": 32.8597,
+      "metadata": {"currency": "TRY", "website": "https://www.tcmb.gov.tr"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "CBE",
+      "point_type": "central_bank",
+      "name": "Central Bank of Egypt",
+      "country": "Egypt",
+      "country_code": "EG",
+      "latitude": 30.0444,
+      "longitude": 31.2357,
+      "metadata": {"currency": "EGP", "website": "https://www.cbe.org.eg"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "NORGES",
+      "point_type": "central_bank",
+      "name": "Norges Bank",
+      "country": "Norway",
+      "country_code": "NO",
+      "latitude": 59.9139,
+      "longitude": 10.7522,
+      "metadata": {"currency": "NOK", "website": "https://www.norges-bank.no"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "RIKSBANK",
+      "point_type": "central_bank",
+      "name": "Sveriges Riksbank",
+      "country": "Sweden",
+      "country_code": "SE",
+      "latitude": 59.3293,
+      "longitude": 18.0686,
+      "metadata": {"currency": "SEK", "website": "https://www.riksbank.se"},
+      "is_active": true
+    }
+  },
+  {
+    "model": "core.staticpoint",
+    "fields": {
+      "code": "BI",
+      "point_type": "central_bank",
+      "name": "Bank Indonesia",
+      "country": "Indonesia",
+      "country_code": "ID",
+      "latitude": -6.2146,
+      "longitude": 106.8451,
+      "metadata": {"currency": "IDR", "website": "https://www.bi.go.id"},
+      "is_active": true
+    }
+  }
+]

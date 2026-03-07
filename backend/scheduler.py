@@ -24,6 +24,7 @@ def run_scheduler() -> None:
         fetch_earthquakes_job,
         fetch_forex_job,
     )
+    from newsletter.tasks import enqueue_generate_newsletter, enqueue_send_newsletter
 
     fetch_interval      = int(os.getenv("FETCH_INTERVAL_MINUTES", "10"))
     process_interval    = int(os.getenv("PROCESS_INTERVAL_MINUTES", "10"))
@@ -32,6 +33,10 @@ def run_scheduler() -> None:
     notam_interval      = int(os.getenv("NOTAM_FETCH_INTERVAL_MINUTES", "15"))
     earthquake_interval = int(os.getenv("EARTHQUAKE_FETCH_INTERVAL_MINUTES", "5"))
     forex_interval      = int(os.getenv("FOREX_FETCH_INTERVAL_MINUTES", "15"))
+
+    # Newsletter: run once per day at configured UTC hours (converted to minutes-from-midnight)
+    newsletter_generate_hour = int(os.getenv("NEWSLETTER_GENERATE_HOUR", "6"))
+    newsletter_send_hour     = int(os.getenv("NEWSLETTER_SEND_HOUR", "7"))
 
     scheduler = DjangoCronScheduler(logging_level="INFO")
 
@@ -46,6 +51,10 @@ def run_scheduler() -> None:
     reg(fetch_notams_job.delay,    notam_interval)
     reg(fetch_earthquakes_job.delay, earthquake_interval)
     reg(fetch_forex_job.delay,     forex_interval)
+    # Daily newsletter jobs — interval = 24h so they fire once per scheduler cycle per day
+    reg(enqueue_generate_newsletter, newsletter_generate_hour * 60)
+    # TODO: Enable After AWS SES is configured properly
+    # reg(enqueue_send_newsletter,     newsletter_send_hour * 60)
 
     print(
         "Scheduler running: "
@@ -55,7 +64,9 @@ def run_scheduler() -> None:
         f"prices every {price_interval}m, "
         f"notam every {notam_interval}m, "
         f"earthquakes every {earthquake_interval}m, "
-        f"forex every {forex_interval}m"
+        f"forex every {forex_interval}m | "
+        f"newsletter generate at ~{newsletter_generate_hour:02d}:00 UTC, "
+        f"send at ~{newsletter_send_hour:02d}:00 UTC"
     )
 
     scheduler.start()

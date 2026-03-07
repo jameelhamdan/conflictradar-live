@@ -1,6 +1,6 @@
-# Project: radar-live
+# Project: conflictradar.live
 
-Live event detection and mapping system. Ingests news articles from multiple sources, runs NLP analysis, clusters them into geolocated events, and displays them on an interactive world map in real time.
+Live geopolitical event detection and mapping system. Ingests news from Telegram channels, runs NLP analysis, clusters articles into geolocated events, and displays them on an interactive world map. Sends a daily AI-written email briefing to subscribers.
 
 ---
 
@@ -11,20 +11,23 @@ Live event detection and mapping system. Ingests news articles from multiple sou
 1. **Data Ingestion** — fetch articles from Telegram channels and web sources on a schedule
 2. **NLP Processing** — extract locations, sentiment, intensity, and category from each article
 3. **Event Aggregation** — cluster articles by location + time + category into Event objects
-4. **REST API** — serve events and sources to the frontend via DRF serializers
+4. **REST API** — serve events, sources, and newsletters to the frontend via DRF
 5. **Live Map** — display events as markers on a Leaflet map, colored by category and sized by intensity
 6. **Filtering** — filter events by category, date range, and bounding box
-7. **Event Detail** — drill into an event to see contributing articles with links to sources
+7. **Event Detail** — drill into an event to see contributing articles with source links
 8. **Auto-refresh** — frontend polls for new events every 60 seconds without full page reload
+9. **Newsletter** — daily AI-written briefing generated from top events, sent via email to subscribers
+10. **Subscription flow** — subscribe, confirm via email link, unsubscribe via token link
 
 ### Non-Functional
 
-- All pipeline stages run every **10 minutes** with a **30-minute hard timeout**; RQ kills any job still running after 30 minutes and the next cycle starts fresh
+- All pipeline stages run every **10 minutes** with a **30-minute hard timeout**
 - API response time < 500ms for typical event list queries
 - Frontend works on modern browsers (Chrome, Firefox, Safari latest)
 - Docker Compose starts the full stack with a single `docker compose up`
 - HTTPS via Let's Encrypt with automatic cert renewal
 - Stateless backend workers — all shared state in MongoDB or Redis
+- Emails rendered as HTML with plain-text fallback; sent via AWS SES in production
 
 ---
 
@@ -32,26 +35,27 @@ Live event detection and mapping system. Ingests news articles from multiple sou
 
 ```text
 Browser
-  └── nginx (:80 / :443)          reverse proxy + TLS termination
-        ├── /api/         → backend:8000   Django REST API (DRF)
-        ├── /admin/       → backend:8000   Django admin
-        ├── /django_static/ → backend:8000 Whitenoise static files
-        └── /             → frontend:80  React SPA
+  └── nginx (:80 / :443)            reverse proxy + TLS termination
+        ├── /api/           → backend:8000   Django REST API (DRF)
+        ├── /admin/         → backend:8000   Django admin
+        ├── /django_static/ → backend:8000   Whitenoise static files
+        └── /               → frontend:80    React SPA
 
 backend (uvicorn :8000)
-  ├── services/api/       DRF serializers + APIView endpoints
-  ├── services/accounts/  Custom User model
-  └── core/               Article, Event, Source models (MongoDB)
+  ├── api/            DRF serializers + APIView endpoints
+  ├── newsletter/     Subscriber + DailyNewsletter models + subscribe/confirm/unsubscribe
+  ├── core/           Article, Event, Source models + pipeline tasks
+  └── accounts/       Custom User model (email-based auth)
 
 worker (python worker.py)
-  ├── 4× RQ workers       process high / default / low queues
-  ├── Scheduler           enqueues jobs every 10 minutes
-  └── Health check        HTTP :8001
+  ├── 4× RQ workers   process high / default / low queues
+  ├── Scheduler       enqueues pipeline + newsletter jobs on schedule
+  └── Health check    HTTP :8001
 
-certbot                   auto-renews Let's Encrypt certs every 12 hours
+certbot               auto-renews Let's Encrypt certs every 12 hours
 
-MongoDB 8 (:27017)        all data storage
-Redis (:6379)             RQ job queues + sessions cache
+MongoDB 8 (:27017)    all data storage
+Redis (:6379)         RQ job queues + Django cache (geocode + sessions)
 ```
 
 ---
@@ -68,9 +72,9 @@ Redis (:6379)             RQ job queues + sessions cache
 ### Stage 2 — process_articles (every 10m, timeout 30m)
 
 - Queries unprocessed Articles (`processed_on=null`)
-- Runs spaCy NER to extract entities and location
-- Runs VADER to compute sentiment score
-- Geocodes location string to lat/lng via geopy
+- Runs spaCy NER to extract named entities and location candidate
+- Runs VADER to compute sentiment score [-1, 1]
+- Geocodes location string to lat/lng via geopy (Nominatim), 30-day cache
 - Scores event intensity from keyword heuristics
 - Classifies category via rule-based classifier
 - Writes NLP fields back to Article, sets `processed_on`
@@ -79,10 +83,20 @@ Redis (:6379)             RQ job queues + sessions cache
 
 - Queries Articles processed since last aggregation
 - Groups by (location_name, category, time window)
-- Creates or updates `Event` objects
-- Writes `article_ids`, counts, averages back to Event
+- Creates or updates `Event` objects with article counts, averages
 
-Jobs are enqueued to Redis via RQ with `job_timeout=1800`. The scheduler in `worker.py` enqueues each independently; if a job is still running when the next cycle fires, RQ kills it.
+### Stage 4 — generate_newsletter (daily, timeout 30m)
+
+- Queries today's Events ordered by article_count
+- Sends event list to LLM with a structured JSON prompt
+- Stores LLM-generated subject + paragraphs as a `DailyNewsletter` (status: draft)
+- Idempotent — skips if a newsletter already exists for that date
+
+### Stage 5 — send_newsletter (daily, timeout 30m)
+
+- Loads the draft `DailyNewsletter` for today
+- For each active `Subscriber`: replaces unsubscribe URL placeholder, sends HTML + text email via AWS SES
+- Updates newsletter status to `sent` (or `error` on partial failure)
 
 ---
 
@@ -92,9 +106,14 @@ All responses are serialized by DRF. Dates are ISO 8601 UTC strings.
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| GET | `/api/events/` | List events — `category`, `start`, `end`, `limit`, `bbox` query params |
+| GET | `/api/events/` | List events — `category`, `start`, `end`, `limit`, `bbox` |
 | GET | `/api/events/<id>/` | Event detail + contributing articles |
 | GET | `/api/sources/` | List configured sources |
+| GET | `/api/newsletter/` | List sent newsletters |
+| GET | `/api/newsletter/<date>/` | Newsletter detail (YYYY-MM-DD) |
+| POST | `/api/newsletter/subscribe/` | Subscribe — sends confirmation email |
+| GET | `/api/newsletter/confirm/<token>/` | Confirm subscription |
+| GET | `/api/newsletter/unsubscribe/<token>/` | Unsubscribe |
 
 ---
 
@@ -102,16 +121,16 @@ All responses are serialized by DRF. Dates are ISO 8601 UTC strings.
 
 ### Source
 
-Configuration for a data source (Telegram channel, RSS feed, web API).
+Configuration for a data source (Telegram channel, RSS feed).
 
 | Field | Type | Notes |
 | ----- | ---- | ----- |
 | code | CharField | Unique identifier |
-| type | SourceType | TELEGRAM, RSS, API, WEBSITE, … |
+| type | SourceType | TELEGRAM, RSS, API, … |
 | name | CharField | Display name |
 | url | URLField | Optional |
 | author_slug | CharField | Telegram channel username |
-| headers | JSONField | API credentials (TELEGRAM_API_ID, etc.) |
+| headers | JSONField | Credentials (TELEGRAM_API_ID, etc.) |
 
 ### Article
 
@@ -149,6 +168,49 @@ An aggregated event derived from one or more Articles at the same location.
 | article_ids | JSONField | List of Article UUID strings |
 | source_codes | JSONField | List of source codes |
 
+### Subscriber
+
+A newsletter subscriber.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| email | CharField | Unique |
+| token | UUIDField | Used for confirm + unsubscribe links |
+| subscribed_at | DateTimeField | |
+| confirmed_at | DateTimeField | Null until confirmed |
+| is_active | BooleanField | True only after email confirmation |
+| unsubscribed_at | DateTimeField | Set on unsubscribe |
+
+### DailyNewsletter
+
+One newsletter edition per day.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| date | DateField | Unique |
+| subject | CharField | LLM-generated headline |
+| html_body | TextField | Rendered HTML (unsubscribe URL is a placeholder) |
+| text_body | TextField | Plain-text fallback |
+| status | CharField | draft / sending / sent / error |
+| generated_at | DateTimeField | |
+| sent_at | DateTimeField | |
+| sent_count | IntegerField | Number of successful sends |
+| event_count | IntegerField | Events used to generate the briefing |
+
+---
+
+## Event Categories
+
+| Category | Description |
+| -------- | ----------- |
+| `conflict` | Armed conflict, airstrikes, military operations, casualties |
+| `protest` | Demonstrations, civil unrest, strikes, riots |
+| `disaster` | Natural or man-made disasters, evacuations, epidemics |
+| `political` | Elections, coups, diplomatic events, government decisions |
+| `economic` | Trade, markets, inflation, energy, fiscal policy |
+| `crime` | Arrests, violence, corruption, trafficking, investigations |
+| `general` | Anything that doesn't match above categories |
+
 ---
 
 ## Frontend
@@ -161,7 +223,7 @@ An aggregated event derived from one or more Articles at the same location.
 
 ### Event List
 
-- Fixed-width side panel (380px)
+- Fixed-width side panel
 - Scrolls independently of map
 - Selecting a card flies the map to that event's marker
 
@@ -169,6 +231,11 @@ An aggregated event derived from one or more Articles at the same location.
 
 - Shows: category badge, time-ago, title, location, article count, intensity bar
 - Expand button lazy-loads contributing articles with source links via `/api/events/<id>/`
+
+### Newsletter Pages
+
+- `/newsletter` — list of sent newsletters with links to view each
+- `/newsletter/<date>` — full newsletter view in browser
 
 ### Filters
 
@@ -179,6 +246,19 @@ An aggregated event derived from one or more Articles at the same location.
 ### Polling
 
 - `setInterval` every 60 seconds re-fetches `/api/events/` with current filters
+
+---
+
+## Email Templates
+
+All transactional emails are HTML with plain-text fallbacks, rendered via Django's template engine and sent via the configured email provider.
+
+| Template | Purpose |
+| -------- | ------- |
+| `newsletter/email.html` | Daily briefing (HTML) |
+| `newsletter/email.txt` | Daily briefing (plain text) |
+| `newsletter/confirm_email.html` | Subscription confirmation (HTML) |
+| `newsletter/confirm_email.txt` | Subscription confirmation (plain text) |
 
 ---
 
@@ -202,7 +282,6 @@ An aggregated event derived from one or more Articles at the same location.
 
 ```bash
 DOMAIN=localhost docker compose up --build
-
 docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 ```
@@ -210,8 +289,6 @@ docker compose exec backend python manage.py createsuperuser
 Access at <http://localhost>.
 
 ### HTTPS with Let's Encrypt (production)
-
-Run once to bootstrap certificates, then start the full stack:
 
 ```bash
 export DOMAIN=yourdomain.com

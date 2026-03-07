@@ -1,0 +1,405 @@
+[
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "reuters-world",
+      "type": "rss",
+      "name": "Reuters World News",
+      "description": "World news from Reuters.",
+      "url": "https://feeds.reuters.com/reuters/worldNews",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "ap-top",
+      "type": "rss",
+      "name": "Associated Press Top News",
+      "description": "Top news from the Associated Press.",
+      "url": "https://feeds.apnews.com/rss/apf-topnews",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "voa-world",
+      "type": "rss",
+      "name": "Voice of America World",
+      "description": "World news from Voice of America.",
+      "url": "https://www.voanews.com/api/ztmqoyeq_e",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "politico-eu",
+      "type": "rss",
+      "name": "Politico Europe",
+      "description": "European politics and policy news from Politico.",
+      "url": "https://www.politico.eu/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "the-hindu",
+      "type": "rss",
+      "name": "The Hindu",
+      "description": "News and analysis from India's The Hindu newspaper.",
+      "url": "https://www.thehindu.com/feeder/default.rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "japan-times",
+      "type": "rss",
+      "name": "Japan Times",
+      "description": "English-language news from Japan and Asia.",
+      "url": "https://www.japantimes.co.jp/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "africa-news",
+      "type": "rss",
+      "name": "Africa News",
+      "description": "Pan-African news from AfricaNews.",
+      "url": "https://www.africanews.com/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "bbc-middle-east",
+      "type": "rss",
+      "name": "BBC Middle East",
+      "description": "Middle East news from the BBC.",
+      "url": "http://feeds.bbci.co.uk/news/world/middle_east/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "straits-times",
+      "type": "rss",
+      "name": "The Straits Times",
+      "description": "Singapore's leading English newspaper covering Asia and the world.",
+      "url": "https://www.straitstimes.com/news/world/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "foreign-policy",
+      "type": "rss",
+      "name": "Foreign Policy",
+      "description": "Global politics, security, and economics from Foreign Policy magazine.",
+      "url": "https://foreignpolicy.com/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "ft-world",
+      "type": "rss",
+      "name": "Financial Times",
+      "description": "Global business and financial news from the Financial Times.",
+      "url": "https://www.ft.com/rss/home/uk",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "bloomberg-markets",
+      "type": "rss",
+      "name": "Bloomberg Markets",
+      "description": "Markets and financial news from Bloomberg.",
+      "url": "https://feeds.bloomberg.com/markets/news.rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "forbes-business",
+      "type": "rss",
+      "name": "Forbes Business",
+      "description": "Business news and analysis from Forbes.",
+      "url": "https://www.forbes.com/business/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "wsj-markets",
+      "type": "rss",
+      "name": "Wall Street Journal Markets",
+      "description": "Markets news from The Wall Street Journal.",
+      "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "business-insider",
+      "type": "rss",
+      "name": "Business Insider",
+      "description": "Business and financial news from Business Insider.",
+      "url": "https://feeds.businessinsider.com/custom/all",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "imf-news",
+      "type": "rss",
+      "name": "IMF News",
+      "description": "News and press releases from the International Monetary Fund.",
+      "url": "https://www.imf.org/en/News/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "world-bank-blog",
+      "type": "rss",
+      "name": "World Bank Blogs",
+      "description": "Economic research and analysis from the World Bank.",
+      "url": "https://blogs.worldbank.org/en/feed",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "project-syndicate",
+      "type": "rss",
+      "name": "Project Syndicate",
+      "description": "Global economic and political commentary from Project Syndicate.",
+      "url": "https://www.project-syndicate.org/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "brookings",
+      "type": "rss",
+      "name": "Brookings Institution",
+      "description": "Economic and policy research from the Brookings Institution.",
+      "url": "https://www.brookings.edu/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "oecd-news",
+      "type": "rss",
+      "name": "OECD News",
+      "description": "Economic news and data from the OECD.",
+      "url": "https://www.oecd.org/newsroom/news.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "guardian-crime",
+      "type": "rss",
+      "name": "The Guardian Crime",
+      "description": "Crime and justice reporting from The Guardian.",
+      "url": "https://www.theguardian.com/uk/crime/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "reuters-crime",
+      "type": "rss",
+      "name": "Reuters Crime",
+      "description": "Crime and justice news from Reuters.",
+      "url": "https://feeds.reuters.com/reuters/crimeNews",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "interpol-news",
+      "type": "rss",
+      "name": "Interpol News",
+      "description": "Press releases and news from Interpol.",
+      "url": "https://www.interpol.int/en/News-and-Events/News/rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "un-crime",
+      "type": "rss",
+      "name": "UN Crime & Justice",
+      "description": "Crime prevention and criminal justice news from the United Nations.",
+      "url": "https://news.un.org/feed/subscribe/en/news/topic/crime-prevention-and-criminal-justice/feed/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "propublica",
+      "type": "rss",
+      "name": "ProPublica",
+      "description": "Investigative journalism covering crime, corruption, and public interest topics.",
+      "url": "https://feeds.propublica.org/propublica/main",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "occrp",
+      "type": "rss",
+      "name": "OCCRP",
+      "description": "Organised Crime and Corruption Reporting Project.",
+      "url": "https://www.occrp.org/en/rss/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "venturebeat",
+      "type": "rss",
+      "name": "VentureBeat",
+      "description": "Technology and AI news from VentureBeat.",
+      "url": "https://venturebeat.com/feed/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "zdnet",
+      "type": "rss",
+      "name": "ZDNet",
+      "description": "Technology news, analysis, and reviews from ZDNet.",
+      "url": "https://www.zdnet.com/news/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "ieee-spectrum",
+      "type": "rss",
+      "name": "IEEE Spectrum",
+      "description": "Technology and engineering news from IEEE Spectrum.",
+      "url": "https://spectrum.ieee.org/feeds/feed.rss",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "engadget",
+      "type": "rss",
+      "name": "Engadget",
+      "description": "Consumer technology news and reviews from Engadget.",
+      "url": "https://www.engadget.com/rss.xml",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  },
+  {
+    "model": "core.source",
+    "fields": {
+      "code": "cnet-tech",
+      "type": "rss",
+      "name": "CNET Tech",
+      "description": "Technology news and reviews from CNET.",
+      "url": "https://www.cnet.com/rss/news/",
+      "author_slug": "",
+      "headers": {},
+      "is_enabled": true
+    }
+  }
+]

@@ -148,7 +148,11 @@ class Workflow:
             sentiments = [a.sentiment for a in group if a.sentiment is not None]
             intensities = [a.event_intensity for a in group if a.event_intensity is not None]
             avg_sentiment = round(sum(sentiments) / len(sentiments), 4) if sentiments else None
-            avg_intensity = round(sum(intensities) / len(intensities), 4) if intensities else None
+            base_intensity = round(sum(intensities) / len(intensities), 4) if intensities else None
+            # Corroboration boost: more articles covering the same event → higher importance.
+            # Saturates at 10 articles (+0.3 max), capped at 1.0.
+            corroboration_boost = min(len(group) / 10.0, 1.0) * 0.3
+            avg_intensity = round(min((base_intensity or 0) + corroboration_boost, 1.0), 4) if base_intensity is not None else None
 
             started_at = min(a.published_on for a in group)
             article_ids = [str(a.id) for a in group]

@@ -167,7 +167,6 @@ export default function TermsPage() {
         padding: '1.25rem 2rem',
         display: 'flex', gap: '1.25rem', flexWrap: 'wrap',
         fontSize: '0.78rem', color: '#44445a',
-        maxWidth: 720, margin: '0 auto',
       }}>
         <a href="/terms" style={{ color: '#7c9ef8', textDecoration: 'none' }}>Terms of Service</a>
         <a href="/privacy" style={{ color: '#44445a', textDecoration: 'none' }}>Privacy Policy</a>

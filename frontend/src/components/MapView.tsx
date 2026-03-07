@@ -16,8 +16,126 @@ import { categoryShapeSvg } from "../shapes";
 import { timeAgo, CategoryBadge, EventMeta } from "./EventUI";
 import NotamOverlay from "./NotamOverlay";
 import EarthquakeLayer from "./EarthquakeLayer";
-import StaticPointLayer from "./StaticPointLayer";
-import type { EventSummary } from "../types";
+import { fetchStaticPoints } from "../api/streams";
+import type { EventSummary, StaticPoint, StaticPointType } from "../types";
+
+// --- Static point helpers ---
+const POINT_TYPE_COLOR: Record<StaticPointType, string> = {
+  exchange:           '#4fc3f7',
+  commodity_exchange: '#ffb74d',
+  port:               '#81c784',
+  central_bank:       '#ce93d8',
+}
+const POINT_TYPE_SYMBOL: Record<StaticPointType, string> = {
+  exchange:           '◈',
+  commodity_exchange: '◆',
+  port:               '⚓',
+  central_bank:       '◉',
+}
+const POINT_TYPE_LABEL: Record<StaticPointType, string> = {
+  exchange:           'Stock Exchange',
+  commodity_exchange: 'Commodity Exchange',
+  port:               'Major Port',
+  central_bank:       'Central Bank',
+}
+
+function countryFlag(code: string): string {
+  return code.toUpperCase().split('').map(c =>
+    String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
+  ).join('')
+}
+
+function makeStaticIcon(type: StaticPointType): L.DivIcon {
+  const color = POINT_TYPE_COLOR[type]
+  const symbol = POINT_TYPE_SYMBOL[type]
+  const size = 18
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;border-radius:3px;background:${color}22;border:1.5px solid ${color}99;display:flex;align-items:center;justify-content:center;font-size:10px;color:${color};line-height:1">${symbol}</div>`,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2 + 6)],
+  })
+}
+
+function StaticPointCard({ point }: { point: StaticPoint }) {
+  const type = point.point_type as StaticPointType
+  const color = POINT_TYPE_COLOR[type]
+  const symbol = POINT_TYPE_SYMBOL[type]
+  const label = POINT_TYPE_LABEL[type]
+  const flag = countryFlag(point.country_code)
+  const m = point.metadata
+  return (
+    <div style={{ borderLeft: `3px solid ${color}`, background: "#16161f", padding: "0.65rem 0.8rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.32rem" }}>
+        <span style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: 3, background: color + "22", color, border: `1px solid ${color}55`, fontWeight: 600 }}>
+          {symbol} {label}
+        </span>
+        <span style={{ fontSize: "0.68rem", color: "#666" }}>{flag} {point.country_code}</span>
+      </div>
+      <div style={{ fontSize: "0.85rem", fontWeight: 500, lineHeight: 1.35, marginBottom: "0.35rem", color: "#d8d8e8" }}>
+        {point.name}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "0.35rem" }}>
+        <span style={{ fontSize: "0.72rem", color: "#888899" }}>{point.country}</span>
+        <span style={{ fontSize: "0.63rem", padding: "1px 5px", borderRadius: 3, background: color + "22", color, border: `1px solid ${color}44` }}>{point.code}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {(type === 'exchange' || type === 'central_bank') && Boolean(m.timezone) && (
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.7rem" }}>
+            <span style={{ color: "#888899" }}>Timezone</span>
+            <span style={{ color: "#c8c8d8" }}>{String(m.timezone)}</span>
+          </div>
+        )}
+        {type === 'central_bank' && Boolean(m.currency) && (
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.7rem" }}>
+            <span style={{ color: "#888899" }}>Currency</span>
+            <span style={{ color: "#c8c8d8" }}>{String(m.currency)}</span>
+          </div>
+        )}
+        {(type === 'exchange' || type === 'central_bank') && Boolean(m.website) && (
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.7rem" }}>
+            <span style={{ color: "#888899" }}>Website</span>
+            <a href={`https://${String(m.website)}`} target="_blank" rel="noopener noreferrer"
+              style={{ color, textDecoration: "none" }}
+              onMouseEnter={e => (e.currentTarget.style.textDecoration = "underline")}
+              onMouseLeave={e => (e.currentTarget.style.textDecoration = "none")}
+            >{String(m.website)}</a>
+          </div>
+        )}
+        {type === 'commodity_exchange' && Array.isArray(m.products) && (
+          <div>
+            <div style={{ fontSize: "0.68rem", color: "#888899", marginBottom: 4 }}>Products</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {(m.products as string[]).map(p => (
+                <span key={p} style={{ fontSize: "0.63rem", padding: "1px 6px", borderRadius: 3, background: color + "18", color, border: `1px solid ${color}44` }}>{p}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {type === 'port' && (
+          <>
+            {Boolean(m.type) && (
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.7rem" }}>
+                <span style={{ color: "#888899" }}>Port type</span>
+                <span style={{ color: "#c8c8d8" }}>{String(m.type)}</span>
+              </div>
+            )}
+            {Boolean(m.teu_rank) && (
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.7rem" }}>
+                <span style={{ color: "#888899" }}>TEU rank</span>
+                <span style={{ color: "#c8c8d8" }}>{`#${String(m.teu_rank)} globally`}</span>
+              </div>
+            )}
+            {Boolean(m.note) && (
+              <div style={{ fontSize: "0.68rem", color: "#888899", fontStyle: "italic", marginTop: 2 }}>{String(m.note)}</div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function intensitySize(intensity: number | null): number {
   if (!intensity) return 22;
@@ -44,24 +162,35 @@ interface Cluster {
   lat: number;
   lng: number;
   events: EventSummary[];
+  staticPoints: StaticPoint[];
 }
 
-function buildClusters(events: EventSummary[], zoom: number): Cluster[] {
+function buildClusters(events: EventSummary[], staticPoints: StaticPoint[], zoom: number): Cluster[] {
   const precision =
     zoom < 3 ? 0 : zoom < 5 ? 1 : zoom < 8 ? 2 : zoom < 11 ? 3 : 10;
   const scale = Math.pow(10, precision);
-  const groups = new Map<string, EventSummary[]>();
+  const groups = new Map<string, { evs: EventSummary[]; sps: StaticPoint[] }>();
   for (const ev of events) {
     if (ev.latitude == null || ev.longitude == null) continue;
     const key = `${Math.round(ev.latitude * scale)},${Math.round(ev.longitude * scale)}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(ev);
+    if (!groups.has(key)) groups.set(key, { evs: [], sps: [] });
+    groups.get(key)!.evs.push(ev);
   }
-  return Array.from(groups.values()).map((evs) => ({
-    lat: evs.reduce((s, e) => s + e.latitude!, 0) / evs.length,
-    lng: evs.reduce((s, e) => s + e.longitude!, 0) / evs.length,
-    events: evs,
-  }));
+  for (const sp of staticPoints) {
+    const key = `${Math.round(sp.latitude * scale)},${Math.round(sp.longitude * scale)}`;
+    if (!groups.has(key)) groups.set(key, { evs: [], sps: [] });
+    groups.get(key)!.sps.push(sp);
+  }
+  return Array.from(groups.values()).map(({ evs, sps }) => {
+    const allLats = [...evs.map(e => e.latitude!), ...sps.map(s => s.latitude)];
+    const allLngs = [...evs.map(e => e.longitude!), ...sps.map(s => s.longitude)];
+    return {
+      lat: allLats.reduce((s, v) => s + v, 0) / allLats.length,
+      lng: allLngs.reduce((s, v) => s + v, 0) / allLngs.length,
+      events: evs,
+      staticPoints: sps,
+    };
+  });
 }
 
 function makeClusterIcon(
@@ -129,28 +258,60 @@ interface ClusteredMarkersProps {
   events: EventSummary[];
   selectedId: string | null;
   onSelectEvent: (id: string) => void;
+  staticPoints: StaticPoint[];
+  showStaticPoints: boolean;
 }
 
 function ClusteredMarkers({
   events,
   selectedId,
   onSelectEvent,
+  staticPoints,
+  showStaticPoints,
 }: ClusteredMarkersProps) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
   useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
 
-  const clusters = buildClusters(events, zoom);
+  const visibleStatic = showStaticPoints ? staticPoints : [];
+  const clusters = buildClusters(events, visibleStatic, zoom);
 
   return (
     <>
       {clusters.map((cluster, i) => {
+        const hasEvents = cluster.events.length > 0;
+        const hasSps = cluster.staticPoints.length > 0;
+
+        // Solo static point(s), no events at this location
+        if (!hasEvents && hasSps) {
+          const sp = cluster.staticPoints[0];
+          const spColor = POINT_TYPE_COLOR[sp.point_type as StaticPointType];
+          return (
+            <Marker
+              key={`sp-${cluster.staticPoints.map(s => s.code).join('-')}`}
+              position={[cluster.lat, cluster.lng]}
+              icon={makeStaticIcon(sp.point_type as StaticPointType)}
+            >
+              <Popup closeButton={false} className="cr-popup">
+                <div style={{ width: 264, background: "#16161f", fontFamily: "inherit" }}>
+                  {cluster.staticPoints.map((s, si) => (
+                    <div key={s.code}>
+                      {si > 0 && <div style={{ height: 1, background: "#2a2a3a" }} />}
+                      <StaticPointCard point={s} />
+                    </div>
+                  ))}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        }
+
+        // Single event (with or without co-located static points)
         if (cluster.events.length === 1) {
           const ev = cluster.events[0];
           const color = categoryColor(ev.category);
           const size = intensitySize(ev.avg_intensity);
           const selected = selectedId === ev.id;
-          const Icon = categoryIcon(ev.category);
           return (
             <Marker
               key={ev.id}
@@ -159,47 +320,52 @@ function ClusteredMarkers({
               eventHandlers={{ click: () => onSelectEvent(ev.id) }}
             >
               <Popup closeButton={false} className="cr-popup">
-                <div
-                  style={{
-                    width: 264,
-                    borderLeft: `3px solid ${color}`,
-                    background: "#16161f",
-                    padding: "0.65rem 0.8rem",
-                    fontFamily: "inherit",
-                  }}
-                >
+                <div style={{ width: 264, background: "#16161f", fontFamily: "inherit" }}>
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "0.32rem",
+                      borderLeft: `3px solid ${color}`,
+                      padding: "0.65rem 0.8rem",
                     }}
                   >
-                    <CategoryBadge category={ev.category} compact />
-                    <span style={{ fontSize: "0.7rem", color: "#666" }}>
-                      {timeAgo(ev.started_at)}
-                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "0.32rem",
+                      }}
+                    >
+                      <CategoryBadge category={ev.category} compact />
+                      <span style={{ fontSize: "0.7rem", color: "#666" }}>
+                        {timeAgo(ev.started_at)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "0.85rem",
+                        fontWeight: 500,
+                        lineHeight: 1.35,
+                        marginBottom: "0.38rem",
+                        color: "#d8d8e8",
+                      }}
+                    >
+                      {ev.title}
+                    </div>
+                    <EventMeta event={ev} compact />
                   </div>
-                  <div
-                    style={{
-                      fontSize: "0.85rem",
-                      fontWeight: 500,
-                      lineHeight: 1.35,
-                      marginBottom: "0.38rem",
-                      color: "#d8d8e8",
-                    }}
-                  >
-                    {ev.title}
-                  </div>
-                  <EventMeta event={ev} compact />
+                  {cluster.staticPoints.map((sp) => (
+                    <div key={sp.code}>
+                      <div style={{ height: 1, background: "#2a2a3a" }} />
+                      <StaticPointCard point={sp} />
+                    </div>
+                  ))}
                 </div>
               </Popup>
             </Marker>
           );
         }
 
-        // Cluster marker — popup lists all events
+        // Multiple events (with or without co-located static points)
         return (
           <Marker
             key={`cluster-${cluster.lat.toFixed(4)}-${cluster.lng.toFixed(4)}-${i}`}
@@ -212,7 +378,7 @@ function ClusteredMarkers({
                   width: 284,
                   background: "#16161f",
                   fontFamily: "inherit",
-                  maxHeight: 380,
+                  maxHeight: 420,
                   overflowY: "auto",
                 }}
               >
@@ -282,6 +448,12 @@ function ClusteredMarkers({
                     </div>
                   );
                 })}
+                {cluster.staticPoints.map((sp) => (
+                  <div key={sp.code}>
+                    <div style={{ height: 1, background: "#2a2a3a" }} />
+                    <StaticPointCard point={sp} />
+                  </div>
+                ))}
               </div>
             </Popup>
           </Marker>
@@ -310,6 +482,22 @@ export default function MapView({
   showEarthquakes,
   showStaticPoints,
 }: MapViewProps) {
+  const [staticPoints, setStaticPoints] = useState<StaticPoint[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchStaticPoints()
+      .then((data) => {
+        if (!cancelled) setStaticPoints(data.results);
+      })
+      .catch(() => {
+        // best-effort — static points are optional
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <MapContainer
       center={[20, 10]}
@@ -333,10 +521,11 @@ export default function MapView({
         events={events}
         selectedId={selectedId}
         onSelectEvent={onSelectEvent}
+        staticPoints={staticPoints}
+        showStaticPoints={showStaticPoints}
       />
       {showNotams && <NotamOverlay refresh={streamRefresh} />}
       {showEarthquakes && <EarthquakeLayer refresh={streamRefresh} />}
-      {showStaticPoints && <StaticPointLayer />}
     </MapContainer>
   );
 }
