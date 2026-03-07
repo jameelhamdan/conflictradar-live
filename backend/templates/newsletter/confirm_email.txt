@@ -1,0 +1,8 @@
+conflictradar.live — Confirm your subscription
+
+Click the link below to confirm your subscription to the conflictradar.live daily briefing:
+
+{{ confirm_url }}
+
+If you did not request this, you can safely ignore this email.
+You will not receive further emails unless you confirm.

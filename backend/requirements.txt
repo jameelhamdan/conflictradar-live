@@ -25,6 +25,9 @@ openai>=2.24.0
 # Geocoding
 geonamescache>=3.0.0
 
+# Email
+boto3>=1.37.0
+
 # Stream data fetching (prices, forex, NOTAM, earthquakes)
 yfinance>=1.2.0
 

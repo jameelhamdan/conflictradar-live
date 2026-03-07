@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     # Apps
     'accounts',
     'core',
+    'newsletter',
     'api',
     'services',
 ]
@@ -230,6 +231,25 @@ RQ_QUEUES = {
     },
 }
 
+# Email — provider selection: 'ses' (AWS SES) or 'smtp' (Django SMTP / console)
+EMAIL_PROVIDER = config('EMAIL_PROVIDER', default='smtp')
+
+# SMTP settings (used when EMAIL_PROVIDER=smtp)
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='localhost')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+
+# AWS SES settings (used when EMAIL_PROVIDER=ses)
+AWS_SES_ACCESS_KEY_ID = config('AWS_SES_ACCESS_KEY_ID', default='')
+AWS_SES_SECRET_KEY = config('AWS_SES_SECRET_KEY', default='')
+AWS_SES_REGION = config('AWS_SES_REGION', default='us-east-1')
+
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='newsletter@localhost')
+NEWSLETTER_BASE_URL = config('NEWSLETTER_BASE_URL', default='http://localhost')
+
 CRON_CLASSES = []
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -242,6 +262,7 @@ MIGRATION_MODULES = {
     "contenttypes": "migrations.contenttypes",
     "accounts": "migrations.accounts",
     "core": "migrations.core",
+    "newsletter": "migrations.newsletter",
 }
 
 AUTHENTICATION_BACKENDS = ['app.backends.ModelAuthBackend']

@@ -1,0 +1,11 @@
+conflictradar.live — Daily Briefing
+{{ date_str }}
+
+{{ subject }}
+
+{% for paragraph in paragraphs %}{{ paragraph }}
+
+{% endfor %}
+---
+You're receiving this because you subscribed to the conflictradar.live daily briefing.
+Unsubscribe: {{ unsubscribe_url }}

@@ -3,6 +3,7 @@ from core.models import (
     Article, Event, Source,
     PriceTick, NotamRecord, NotamZone, EarthquakeRecord, StaticPoint,
 )
+from newsletter.models import DailyNewsletter
 
 
 class ArticleSerializer(serializers.ModelSerializer):
@@ -103,3 +104,27 @@ class StaticPointSerializer(serializers.ModelSerializer):
             'id', 'code', 'point_type', 'name', 'country', 'country_code',
             'latitude', 'longitude', 'metadata', 'is_active',
         ]
+
+
+class NewsletterListSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = DailyNewsletter
+        fields = ['id', 'date', 'subject', 'sent_at', 'event_count', 'status']
+
+
+class NewsletterDetailSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = DailyNewsletter
+        fields = ['id', 'date', 'subject', 'html_body', 'text_body', 'generated_at',
+                  'sent_at', 'sent_count', 'event_count', 'status']
+
+
+class SubscribeSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+    def validate_email(self, value):
+        return value.lower().strip()

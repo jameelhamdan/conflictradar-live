@@ -1,0 +1,29 @@
+from django.core.management.base import BaseCommand
+
+from newsletter.tasks import send_newsletter_job
+
+
+class Command(BaseCommand):
+    help = 'Send the daily newsletter for a given date (or today) to all active subscribers.'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--date',
+            type=str,
+            default=None,
+            help='Date of the newsletter to send (YYYY-MM-DD). Defaults to today.',
+        )
+        parser.add_argument(
+            '--background',
+            action='store_true',
+            help='Enqueue as a background RQ job instead of running in the foreground.',
+        )
+
+    def handle(self, *args, **options):
+        date_str = options.get('date')
+        if options['background']:
+            send_newsletter_job.delay(date_str=date_str)
+            self.stdout.write(self.style.SUCCESS(f'Enqueued newsletter sending for {date_str or "today"}.'))
+        else:
+            result = send_newsletter_job(date_str=date_str)
+            self.stdout.write(self.style.SUCCESS(result))
