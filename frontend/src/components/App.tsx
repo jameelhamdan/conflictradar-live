@@ -245,10 +245,16 @@ export default function App() {
               fontSize: '1.2rem',
               cursor: 'pointer',
               padding: '0.2rem 0.4rem',
-              display: isMobile ? 'flex' : 'none',
+              width: '1.6rem',
+              height: '1.6rem',
+              display: 'flex',
+              visibility: isMobile ? 'visible' : 'hidden',
+              pointerEvents: isMobile ? 'auto' : 'none',
               alignItems: 'center',
+              justifyContent: 'center',
               marginLeft: '0.25rem',
               transition: 'color 0.12s',
+              flexShrink: 0,
             }}
           >
             {sidebarOpen ? '▢' : '≡'}
