@@ -40,6 +40,8 @@ export default function App() {
   const [filters, setFilters] = useState<EventFilters>({ category: "" });
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
   const [mounted, setMounted] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Stream layers
   const [showNotams, setShowNotams] = useState(true);
@@ -89,6 +91,26 @@ export default function App() {
     const timer = setInterval(load, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [load]);
+
+  // Track window size for mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Trigger map resize when sidebar toggles on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 50);
+    }
+  }, [sidebarOpen, isMobile]);
 
   function clearQuickFilter() {
     setQuickFilter("");
@@ -175,6 +197,24 @@ export default function App() {
             >
               About
             </a>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+              style={{
+                background: "none",
+                border: "none",
+                color: sidebarOpen ? "#7c9ef8" : "#55556a",
+                fontSize: "1.2rem",
+                cursor: "pointer",
+                padding: "0.2rem 0.4rem",
+                display: isMobile ? "flex" : "none",
+                alignItems: "center",
+                marginLeft: "0.25rem",
+                transition: "color 0.12s",
+              }}
+            >
+              {sidebarOpen ? "▢" : "≡"}
+            </button>
           </nav>
 
           <div
@@ -320,7 +360,12 @@ export default function App() {
       </header>
 
       <main style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <section style={{ flex: "1 1 60%", minWidth: 0, position: "relative" }}>
+        <section style={{ 
+          flex: isMobile ? (sidebarOpen ? 0 : 1) : "1 1 60%", 
+          minWidth: 0, 
+          position: "relative",
+          display: isMobile && sidebarOpen ? "none" : "block",
+        }}>
           {mounted && (
             <Suspense
               fallback={
@@ -377,10 +422,13 @@ export default function App() {
         </section>
         <section
           style={{
-            flex: "0 0 380px",
+            flex: isMobile ? (sidebarOpen ? 1 : 0) : "0 0 380px",
             overflowY: "auto",
-            borderLeft: "1px solid #1e1e2a",
+            borderLeft: isMobile ? "none" : "1px solid #1e1e2a",
             background: "#0d0d14",
+            display: isMobile && !sidebarOpen ? "none" : "flex",
+            flexDirection: "column",
+            minWidth: 0,
           }}
         >
           <PriceTicker latestTick={latestPriceTick} />

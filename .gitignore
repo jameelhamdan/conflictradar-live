@@ -144,3 +144,6 @@ frontend_dist/
 
 anon.session
 certbot/*
+
+/mongo
+docs
