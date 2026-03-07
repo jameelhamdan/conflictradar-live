@@ -235,30 +235,30 @@ export default function App() {
               </a>
             </nav>
           )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: sidebarOpen ? '#7c9ef8' : '#55556a',
-              fontSize: '1.2rem',
-              cursor: 'pointer',
-              padding: '0.2rem 0.4rem',
-              width: '1.6rem',
-              height: '1.6rem',
-              display: 'flex',
-              visibility: isMobile ? 'visible' : 'hidden',
-              pointerEvents: isMobile ? 'auto' : 'none',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: '0.25rem',
-              transition: 'color 0.12s',
-              flexShrink: 0,
-            }}
-          >
-            {sidebarOpen ? '▢' : '≡'}
-          </button>
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: sidebarOpen ? '#7c9ef8' : '#55556a',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                padding: '0.2rem 0.4rem',
+                width: '1.6rem',
+                height: '1.6rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: '0.25rem',
+                transition: 'color 0.12s',
+                flexShrink: 0,
+              }}
+            >
+              {sidebarOpen ? '✕' : '☰'}
+            </button>
+          )}
           <div
             style={{
               width: 1,
@@ -599,7 +599,7 @@ export default function App() {
                 key={tab}
                 onClick={() => {
                   setMobileTab(tab);
-                  setSection('map');
+                  setSidebarOpen(tab === 'list');
                 }}
                 style={{
                   flex: 1,
