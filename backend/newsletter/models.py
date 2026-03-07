@@ -41,8 +41,7 @@ class DailyNewsletter(models.Model):
 
     date = models.DateField(unique=True)
     subject = models.CharField(max_length=255)
-    html_body = models.TextField()
-    text_body = models.TextField()
+    body = models.TextField(help_text='Newsletter content in Markdown format')
     generated_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(null=True, blank=True)
     sent_count = models.IntegerField(default=0)

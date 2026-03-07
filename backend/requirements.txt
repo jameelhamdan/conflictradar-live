@@ -27,6 +27,7 @@ geonamescache>=3.0.0
 
 # Email
 boto3>=1.37.0
+markdown>=3.7
 
 # Stream data fetching (prices, forex, NOTAM, earthquakes)
 yfinance>=1.2.0

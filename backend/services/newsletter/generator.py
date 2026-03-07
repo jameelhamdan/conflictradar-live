@@ -4,13 +4,7 @@ import json
 import logging
 from datetime import datetime, timezone as dt_timezone
 
-from django.conf import settings
-from django.template.loader import render_to_string
-
 logger = logging.getLogger(__name__)
-
-# Placeholder replaced per-subscriber at send time
-UNSUB_PLACEHOLDER = '__UNSUBSCRIBE_URL__'
 
 
 def day_bounds(date) -> tuple[datetime, datetime]:
@@ -19,19 +13,9 @@ def day_bounds(date) -> tuple[datetime, datetime]:
     return start, end
 
 
-def render_email(subject: str, paragraphs: list[str], date_str: str,
-                 base_url: str, unsubscribe_url: str) -> tuple[str, str]:
-    """Return (html_body, text_body) rendered from Django templates."""
-    context = {
-        'subject': subject,
-        'paragraphs': paragraphs,
-        'date_str': date_str,
-        'base_url': base_url,
-        'unsubscribe_url': unsubscribe_url,
-    }
-    html = render_to_string('newsletter/briefing.html', context)
-    text = render_to_string('newsletter/briefing.txt', context)
-    return html, text
+def build_markdown_body(paragraphs: list[str]) -> str:
+    """Return newsletter body as Markdown (paragraphs separated by blank lines)."""
+    return '\n\n'.join(p.strip() for p in paragraphs if p.strip())
 
 
 def generate_newsletter(date_str: str | None = None) -> str:
@@ -106,21 +90,15 @@ def generate_newsletter(date_str: str | None = None) -> str:
         paragraphs = (
             [f"Today's briefing covers {len(events)} events across "
              f"{len({e.category for e in events})} categories."]
-            + [f'{ev.title} ({ev.location_name})' for ev in events[:5]]
+            + [f'**{ev.category.upper()}** — {ev.title} ({ev.location_name})' for ev in events[:5]]
         )
 
-    base_url = getattr(settings, 'NEWSLETTER_BASE_URL', 'http://localhost')
-    date_str_display = target_date.strftime('%A, %B %d, %Y')
-
-    html_body, text_body = render_email(
-        subject, paragraphs, date_str_display, base_url, UNSUB_PLACEHOLDER
-    )
+    body = build_markdown_body(paragraphs)
 
     newsletter = DailyNewsletter.objects.create(
         date=target_date,
         subject=subject,
-        html_body=html_body,
-        text_body=text_body,
+        body=body,
         status=DailyNewsletter.STATUS_DRAFT,
         event_count=len(events),
     )

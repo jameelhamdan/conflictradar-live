@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import { fetchNewsletter } from "../../api/newsletter";
 import type { NewsletterDetail } from "../../api/newsletter";
 
@@ -108,28 +109,8 @@ export default function NewsletterView({ date, onBack }: Props) {
             >
               {newsletter.subject}
             </h2>
-            {/* Render the plain text body for the dark-theme web view */}
-            <div
-              style={{
-                fontSize: "0.88rem",
-                color: "#c0c0d0",
-                lineHeight: 1.75,
-              }}
-            >
-              {newsletter.text_body
-                .split("\n\n")
-                .filter(
-                  (p) =>
-                    p.trim() &&
-                    !p.startsWith("---") &&
-                    !p.includes("Unsubscribe:") &&
-                    !p.startsWith("conflictradar"),
-                )
-                .map((para, i) => (
-                  <p key={i} style={{ margin: "0 0 1.1em 0" }}>
-                    {para.trim()}
-                  </p>
-                ))}
+            <div className="newsletter-body">
+              <ReactMarkdown>{newsletter.body}</ReactMarkdown>
             </div>
           </div>
         )}

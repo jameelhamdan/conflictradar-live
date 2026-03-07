@@ -10,8 +10,7 @@ export interface NewsletterSummary {
 }
 
 export interface NewsletterDetail extends NewsletterSummary {
-  html_body: string
-  text_body: string
+  body: string
   generated_at: string
   sent_count: number
 }

@@ -29,12 +29,10 @@
           </td>
         </tr>
 
-        <!-- Body paragraphs -->
+        <!-- Body -->
         <tr>
-          <td style="background:#ffffff;padding:8px 32px 28px 32px;">
-            {% for paragraph in paragraphs %}
-            <p style="margin:0 0 1.1em 0;line-height:1.7;color:#2d2d2d;">{{ paragraph }}</p>
-            {% endfor %}
+          <td style="background:#ffffff;padding:8px 32px 28px 32px;font-size:0.95rem;line-height:1.7;color:#2d2d2d;">
+            {{ body_html|safe }}
           </td>
         </tr>
 

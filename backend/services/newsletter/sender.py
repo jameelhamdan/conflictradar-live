@@ -2,11 +2,27 @@
 
 import logging
 
-from django.conf import settings
+import markdown as md_lib
 
-from .generator import UNSUB_PLACEHOLDER
+from django.conf import settings
+from django.template.loader import render_to_string
 
 logger = logging.getLogger(__name__)
+
+
+def _render_email(newsletter, date_str: str, base_url: str, unsubscribe_url: str) -> tuple[str, str]:
+    """Convert Markdown body to HTML and plain text for email sending."""
+    body_html = md_lib.markdown(newsletter.body, extensions=['extra'])
+    context = {
+        'subject': newsletter.subject,
+        'body_html': body_html,
+        'date_str': date_str,
+        'base_url': base_url,
+        'unsubscribe_url': unsubscribe_url,
+    }
+    html = render_to_string('newsletter/briefing.html', context)
+    text = render_to_string('newsletter/briefing.txt', context)
+    return html, text
 
 
 def send_newsletter(date_str: str | None = None) -> str:
@@ -45,14 +61,14 @@ def send_newsletter(date_str: str | None = None) -> str:
     newsletter.status = DailyNewsletter.STATUS_SENDING
     newsletter.save()
 
+    date_str_display = newsletter.date.strftime('%A, %B %d, %Y')
     email_svc = get_email_service()
     sent = 0
     errors = 0
 
     for sub in subscribers:
         unsubscribe_url = f"{base_url}/newsletter/unsubscribe/{sub.token}"
-        html = newsletter.html_body.replace(UNSUB_PLACEHOLDER, unsubscribe_url)
-        text = newsletter.text_body.replace(UNSUB_PLACEHOLDER, unsubscribe_url)
+        html, text = _render_email(newsletter, date_str_display, base_url, unsubscribe_url)
         try:
             email_svc.send(
                 to=sub.email,

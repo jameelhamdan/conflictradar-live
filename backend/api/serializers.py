@@ -119,7 +119,7 @@ class NewsletterDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DailyNewsletter
-        fields = ['id', 'date', 'subject', 'html_body', 'text_body', 'generated_at',
+        fields = ['id', 'date', 'subject', 'body', 'generated_at',
                   'sent_at', 'sent_count', 'event_count', 'status']
 
 

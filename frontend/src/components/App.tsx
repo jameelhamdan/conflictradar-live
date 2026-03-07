@@ -4,7 +4,7 @@ import "../globals.css";
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import EventList from "./events/EventList";
 import PriceTicker from "./events/PriceTicker";
-import { fetchEvents } from "../api/events";
+import { fetchEvents, getBackendVersion } from "../api/events";
 import { useSSE } from "../hooks/useSSE";
 import { categoryColor, categoryShapeComponent } from "../constants";
 import type { EventSummary, EventFilters } from "../types";
@@ -41,6 +41,7 @@ export default function App() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
   const [mounted, setMounted] = useState(false);
 
+  const [version, setVersion] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileTab, setMobileTab] = useState<"map" | "list">("map");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -84,6 +85,7 @@ export default function App() {
       }
       const data = await fetchEvents(effectiveFilters);
       setEvents(data.results);
+      setVersion(getBackendVersion());
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -344,6 +346,19 @@ export default function App() {
                 ? `⚠ ${error}`
                 : `${events.length} events`}
           </span>
+          {version && (
+            <span
+              style={{
+                fontSize: "0.65rem",
+                color: "#2a2a3a",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                fontFamily: "monospace",
+              }}
+            >
+              {version}
+            </span>
+          )}
         </div>
 
         {/* Row 2 — category tabs */}

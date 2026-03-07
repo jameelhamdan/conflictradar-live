@@ -3,9 +3,8 @@ conflictradar.live — Daily Briefing
 
 {{ subject }}
 
-{% for paragraph in paragraphs %}{{ paragraph }}
+{{ body }}
 
-{% endfor %}
 ---
 You're receiving this because you subscribed to the conflictradar.live daily briefing.
 Unsubscribe: {{ unsubscribe_url }}
