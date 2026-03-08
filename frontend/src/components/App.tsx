@@ -135,7 +135,10 @@ export default function App() {
 
   function handleSelectEvent(id: string) {
     setSelectedId(id);
-    if (isMobile) setMobileTab("map");
+    if (isMobile) {
+      setMobileTab("list");
+      setSidebarOpen(true);
+    }
   }
 
   return (

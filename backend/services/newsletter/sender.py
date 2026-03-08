@@ -1,6 +1,7 @@
 """Newsletter sending business logic."""
 
 import logging
+import re as _re
 
 import markdown as md_lib
 
@@ -12,10 +13,18 @@ logger = logging.getLogger(__name__)
 
 def _render_email(newsletter, date_str: str, base_url: str, unsubscribe_url: str) -> tuple[str, str]:
     """Convert Markdown body to HTML and plain text for email sending."""
-    body_html = md_lib.markdown(newsletter.body, extensions=['extra'])
+    raw_html = md_lib.markdown(newsletter.body, extensions=['extra'])
+    # Inline-style <h2> tags for consistent rendering across email clients
+    body_html = _re.sub(
+        r'<h2>',
+        '<h2 style="margin:1.5em 0 0.4em 0;font-size:1.05rem;font-weight:700;color:#111;'
+        'border-bottom:2px solid #e05252;padding-bottom:0.25em;">',
+        raw_html,
+    )
     context = {
         'subject': newsletter.subject,
         'body_html': body_html,
+        'body': newsletter.body,   # raw Markdown — used by briefing.txt plain-text version
         'date_str': date_str,
         'base_url': base_url,
         'unsubscribe_url': unsubscribe_url,

@@ -43,7 +43,17 @@ export default function EventCard({ event, selected, onSelect }: EventCardProps)
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-        <CategoryBadge category={event.category} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+          <CategoryBadge category={event.category} />
+          {event.sub_categories?.map(sub => (
+            <span key={sub} style={{
+              fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: 99,
+              background: '#2a2a3a', color: '#aaa', fontWeight: 500,
+            }}>
+              {sub}
+            </span>
+          ))}
+        </div>
         <span style={{ fontSize: '0.75rem', color: '#666' }}>{timeAgo(event.started_at)}</span>
       </div>
 

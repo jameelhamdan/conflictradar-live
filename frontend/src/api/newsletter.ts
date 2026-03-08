@@ -1,5 +1,16 @@
 const BASE = '/api/newsletter'
 
+export interface NewsletterArticle {
+  id: string
+  title: string
+  source_url: string
+  source_code: string
+  category: string | null
+  published_on: string
+  banner_image_url: string | null
+  event_intensity: number | null
+}
+
 export interface NewsletterSummary {
   id: string
   date: string
@@ -13,6 +24,9 @@ export interface NewsletterDetail extends NewsletterSummary {
   body: string
   generated_at: string
   sent_count: number
+  articles: NewsletterArticle[]
+  cover_image_url: string | null
+  cover_image_credit: string | null
 }
 
 export interface NewslettersResponse {
@@ -29,6 +43,12 @@ export async function fetchNewsletters(): Promise<NewslettersResponse> {
 export async function fetchNewsletter(date: string): Promise<NewsletterDetail> {
   const res = await fetch(`${BASE}/${date}/`)
   if (!res.ok) throw new Error(`Newsletter not found: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchLatestNewsletter(): Promise<NewsletterDetail> {
+  const res = await fetch(`${BASE}/latest/`)
+  if (!res.ok) throw new Error(`No newsletter available: ${res.status}`)
   return res.json()
 }
 

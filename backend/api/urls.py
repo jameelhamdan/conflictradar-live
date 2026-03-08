@@ -8,7 +8,7 @@ from api.views.events import (
 )
 from api.views.newsletter import (
     SubscribeView, ConfirmView, UnsubscribeView,
-    NewsletterListView, NewsletterDetailView,
+    NewsletterListView, NewsletterLatestView, NewsletterDetailView,
 )
 
 urlpatterns = [
@@ -36,6 +36,7 @@ urlpatterns = [
 
     # ── Newsletter ────────────────────────────────────────────────────────────
     path('newsletter/', NewsletterListView.as_view(), name='newsletter-list'),
+    path('newsletter/latest/', NewsletterLatestView.as_view(), name='newsletter-latest'),
     path('newsletter/subscribe/', SubscribeView.as_view(), name='newsletter-subscribe'),
     path('newsletter/confirm/<uuid:token>/', ConfirmView.as_view(), name='newsletter-confirm'),
     path('newsletter/unsubscribe/<uuid:token>/', UnsubscribeView.as_view(), name='newsletter-unsubscribe'),

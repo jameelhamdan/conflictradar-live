@@ -12,6 +12,7 @@ export interface EventSummary {
   latitude: number | null
   longitude: number | null
   category: Category
+  sub_categories: string[]
   avg_intensity: number | null
   title: string
   location_name: string

@@ -32,6 +32,7 @@ class EventSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'category',
+            'sub_categories',
             'location_name',
             'latitude',
             'longitude',
@@ -119,8 +120,11 @@ class NewsletterDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DailyNewsletter
-        fields = ['id', 'date', 'subject', 'body', 'generated_at',
-                  'sent_at', 'sent_count', 'event_count', 'status']
+        fields = [
+            'id', 'date', 'subject', 'body',
+            'articles', 'cover_image_url', 'cover_image_credit',
+            'generated_at', 'sent_at', 'sent_count', 'event_count', 'status',
+        ]
 
 
 class SubscribeSerializer(serializers.Serializer):

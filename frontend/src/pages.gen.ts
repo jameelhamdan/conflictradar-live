@@ -16,6 +16,8 @@ import type { getConfig as File_NewsletterIndex_getConfig } from './pages/newsle
 // prettier-ignore
 import type { getConfig as File_NewsletterUnsubscribeToken_getConfig } from './pages/newsletter/unsubscribe/[token]';
 // prettier-ignore
+import type { getConfig as File_NewsletterYearMonthDay_getConfig } from './pages/newsletter/[year]/[month]/[day]';
+// prettier-ignore
 import type { getConfig as File_Privacy_getConfig } from './pages/privacy';
 // prettier-ignore
 import type { getConfig as File_Terms_getConfig } from './pages/terms';
@@ -28,6 +30,7 @@ type Page =
 | ({ path: '/newsletter/confirm/[token]' } & GetConfigResponse<typeof File_NewsletterConfirmToken_getConfig>)
 | ({ path: '/newsletter' } & GetConfigResponse<typeof File_NewsletterIndex_getConfig>)
 | ({ path: '/newsletter/unsubscribe/[token]' } & GetConfigResponse<typeof File_NewsletterUnsubscribeToken_getConfig>)
+| ({ path: '/newsletter/[year]/[month]/[day]' } & GetConfigResponse<typeof File_NewsletterYearMonthDay_getConfig>)
 | ({ path: '/privacy' } & GetConfigResponse<typeof File_Privacy_getConfig>)
 | ({ path: '/terms' } & GetConfigResponse<typeof File_Terms_getConfig>);
 

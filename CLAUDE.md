@@ -136,7 +136,18 @@ This file gives Claude everything needed to write correct, consistent code for t
   uuids = [uuid.UUID(a) for a in event.article_ids]
   articles = Article.objects.filter(id__in=uuids)
   ```
+- `Article.banner_image_url` — nullable URLField; populated by RSS `media:content`/`media:thumbnail`/enclosure extraction at fetch time, or OG image scrape during `process_articles` (best-effort, HTTPS only)
 - `Event.started_at` is a DateTimeField — always timezone-aware (`django.utils.timezone.now()`)
+
+### Newsletter
+
+- `DailyNewsletter` lives in `backend/newsletter/models.py` — fields: `date` (unique), `subject`, `body` (Markdown), `articles` (JSON snapshot), `cover_image_url`, `cover_image_credit`, `status`, `event_count`
+- Newsletter body is stored as **Markdown** and converted to HTML at send time in `sender.py` — `<h2>` tags get inline-styled for email client compatibility
+- `generate_newsletter()` in `services/newsletter/generator.py` — groups events by category, sends per-category LLM prompt, stores article snapshot + cover image; idempotent (skips if date exists)
+- `send_newsletter()` in `services/newsletter/sender.py` — converts Markdown → HTML, sends to active subscribers; skips already-sent newsletters
+- `ArticleDatum` in `services/data/base.py` uses a required base TypedDict + optional `banner_image_url` extension (`total=False` on the subclass only); all other fields are required
+- Frontend newsletter route: `/newsletter` (list + reader), `/newsletter/YYYY/MM/DD` (direct date URL — falls back to latest published if date not found)
+- `NewsletterView` accepts an optional `initialData` prop — pass it to skip the internal fetch when data is already loaded
 
 ### NLP / Cleaning
 
@@ -167,9 +178,11 @@ This file gives Claude everything needed to write correct, consistent code for t
 
 ### Frontend
 
-- All API calls go through `src/api/events.js` — add new fetch functions there
-- React state lives in `App.jsx`; pass down as props
-- Map markers use `CircleMarker` from react-leaflet; never plain `Marker`
+- All API calls go through typed modules in `src/api/` (`events.ts`, `newsletter.ts`, etc.)
+- React state lives in `App.tsx`; pass down as props
+- Map markers use custom `L.divIcon` via category shape SVG; never plain `Marker` with default icon
+- Frontend uses **Waku** for file-based routing under `src/pages/`; static pages use `render: 'static'`, dynamic pages use `render: 'dynamic'`
+- Dynamic pages read route params from `window.location.pathname` (no Waku router hook needed)
 - Dark theme color palette (inline styles):
   - Background: `#0f0f13`
   - Card: `#1a1a22`
@@ -251,9 +264,14 @@ Define `enqueue_my_job()` above it following the existing pattern.
 | Django settings | [backend/settings/base.py](backend/settings/base.py) |
 | Root URLs | [backend/app/urls.py](backend/app/urls.py) |
 | Mongo app configs | [backend/apps.py](backend/apps.py) |
-| React root | [frontend/src/App.jsx](frontend/src/App.jsx) |
-| API client | [frontend/src/api/events.js](frontend/src/api/events.js) |
-| Map component | [frontend/src/components/MapView.jsx](frontend/src/components/MapView.jsx) |
+| React root | [frontend/src/components/App.tsx](frontend/src/components/App.tsx) |
+| API client (events) | [frontend/src/api/events.ts](frontend/src/api/events.ts) |
+| API client (newsletter) | [frontend/src/api/newsletter.ts](frontend/src/api/newsletter.ts) |
+| Map component | [frontend/src/components/events/MapView.tsx](frontend/src/components/events/MapView.tsx) |
+| Newsletter models | [backend/newsletter/models.py](backend/newsletter/models.py) |
+| Newsletter generator | [backend/services/newsletter/generator.py](backend/services/newsletter/generator.py) |
+| Newsletter sender | [backend/services/newsletter/sender.py](backend/services/newsletter/sender.py) |
+| Waku pages | [frontend/src/pages/](frontend/src/pages/) |
 | Docker services | [docker-compose.yml](docker-compose.yml) |
 | Python deps | [backend/requirements.txt](backend/requirements.txt) |
 
@@ -315,6 +333,10 @@ All three stages run on RQ queues via scheduler. Each job has a 30-minute hard t
 - **Frontend proxy**: in dev, Vite proxies `/api` → `localhost:8000`; in prod, nginx does it
 - **nginx HTTPS**: run `./init-letsencrypt.sh` once before `docker compose up` in production
 - **decouple .env**: `python-decouple` searches from CWD — place `.env` in project root or `cd backend` before running manage.py locally
+- **ArticleDatum `total=False`**: only `banner_image_url` is optional; the required fields (`source_url`, `title`, `content`, etc.) are enforced by the base TypedDict `_ArticleDatumRequired` — do not flatten back to a single `total=False` dict
+- **Newsletter body is Markdown**: stored as raw Markdown in `DailyNewsletter.body`; converted to HTML at send time — do not store HTML
+- **Email `<h2>` styling**: done via regex replace in `sender.py` (inline styles) not in the template — email clients strip `<style>` blocks inconsistently
+- **Newsletter date URL**: `/newsletter/YYYY/MM/DD` falls back to latest published newsletter on 404 — treat the date as a soft hint, not a hard key
 
 ---
 
@@ -346,6 +368,12 @@ python manage.py process_articles --limit 500 --background
 # Aggregate processed articles into events (foreground or background)
 python manage.py aggregate_events --hours 24
 python manage.py aggregate_events --hours 24 --background
+
+# Generate newsletter for a date (foreground)
+python manage.py generate_newsletter --date 2025-03-08
+
+# Send newsletter for a date (foreground)
+python manage.py send_newsletter --date 2025-03-08
 
 # Run worker locally
 python worker.py

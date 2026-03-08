@@ -119,7 +119,7 @@ def _entry_to_datum(
         or source.name
     ).strip()
 
-    return ArticleDatum(
+    datum = ArticleDatum(
         source_url=link,
         author=author,
         author_slug=source.author_slug or source.code,
@@ -128,6 +128,12 @@ def _entry_to_datum(
         published_on=published_on,
         extra_data={'feed_id': entry.get('id') or link},
     )
+
+    image_url = _extract_image_url(entry)
+    if image_url:
+        datum['banner_image_url'] = image_url
+
+    return datum
 
 
 def _parse_entry_date(entry) -> datetime.datetime | None:
@@ -156,3 +162,36 @@ def _first(lst: list, key: str) -> str:
         if val:
             return val
     return ''
+
+
+_IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.webp', '.gif')
+
+
+def _looks_like_image(url: str) -> bool:
+    lower = url.lower().split('?')[0]
+    return any(lower.endswith(ext) for ext in _IMAGE_EXTS)
+
+
+def _extract_image_url(entry) -> str | None:
+    """Extract the first usable image URL from a feedparser entry."""
+    # 1. media:content
+    for m in entry.get('media_content', []):
+        url = m.get('url', '')
+        if not url:
+            continue
+        medium = m.get('medium', '')
+        if medium == 'image' or (not medium and _looks_like_image(url)):
+            return url
+
+    # 2. media:thumbnail
+    for t in entry.get('media_thumbnail', []):
+        url = t.get('url', '')
+        if url:
+            return url
+
+    # 3. RSS enclosures
+    for enc in entry.get('enclosures', []):
+        if enc.get('type', '').startswith('image/'):
+            return enc.get('href') or enc.get('url') or ''
+
+    return None

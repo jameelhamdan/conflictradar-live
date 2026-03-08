@@ -8,11 +8,34 @@ The management commands (fetch_data, process_articles, aggregate_events) are
 thin wrappers that parse CLI args and call or enqueue these functions.
 """
 import logging
+import re
+import requests
 from collections import defaultdict
 from datetime import datetime, timedelta
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _fetch_og_image(url: str) -> str | None:
+    """Best-effort: fetch og:image meta tag from a URL. Returns None on any failure."""
+    try:
+        r = requests.get(url, timeout=5, headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
+        # Read only the first 64 KB — enough to find the <head> og:image tag
+        chunk = next(r.iter_content(65536), b'')
+        r.close()
+        text = chunk.decode('utf-8', errors='ignore')
+        m = re.search(
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+            text,
+        ) or re.search(
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+            text,
+        )
+        return m.group(1).strip() if m else None
+    except Exception:
+        return None
+
 
 class Workflow:
     @classmethod
@@ -91,10 +114,19 @@ class Workflow:
             article.sub_category = features.sub_category
             article.processed_on = timezone.now()
             article.extra_data = {**(article.extra_data or {}), 'llm': features.llm_data}
-            article.save(update_fields=[
+
+            # Best-effort: fetch og:image if no banner set yet and URL is reachable
+            update_fields = [
                 'entities', 'sentiment', 'location', 'latitude', 'longitude',
                 'event_intensity', 'category', 'sub_category', 'processed_on', 'extra_data',
-            ])
+            ]
+            if not article.banner_image_url and article.source_url and article.source_url.startswith('https://'):
+                og = _fetch_og_image(article.source_url)
+                if og:
+                    article.banner_image_url = og
+                    update_fields.append('banner_image_url')
+
+            article.save(update_fields=update_fields)
             processed += 1
             location = features.location or '?'
             category = '/'.join(filter(None, [features.category, features.sub_category]))
@@ -160,6 +192,7 @@ class Workflow:
 
             categories = [a.category for a in group if a.category]
             category = max(set(categories), key=categories.count) if categories else 'general'
+            sub_categories = sorted({a.sub_category for a in group if a.sub_category})
 
             # Average lat/lon across all articles that have coordinates
             lats = [a.latitude for a in group if a.latitude is not None]
@@ -192,6 +225,7 @@ class Workflow:
                     avg_intensity=avg_intensity,
                     article_ids=article_ids,
                     source_codes=source_codes,
+                    sub_categories=sub_categories,
                 )
                 created_count += 1
                 logger.info(f'[aggregate] Created  {location} [{category}] — {len(group)} article(s)')
@@ -205,6 +239,7 @@ class Workflow:
                 event.avg_intensity = avg_intensity
                 event.article_ids = article_ids
                 event.source_codes = source_codes
+                event.sub_categories = sub_categories
                 event.save()
                 updated_count += 1
                 logger.info(f'[aggregate] Updated  {location} [{category}] — {len(group)} article(s)')

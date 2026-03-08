@@ -5,7 +5,9 @@ import type { NewsletterDetail } from "../../api/newsletter";
 
 interface Props {
   date: string;
-  onBack: () => void;
+  onBack?: () => void;
+  /** If provided, skips the internal fetch and uses this data directly. */
+  initialData?: NewsletterDetail;
 }
 
 function formatDate(dateStr: string): string {
@@ -18,60 +20,153 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function NewsletterView({ date, onBack }: Props) {
-  const [newsletter, setNewsletter] = useState<NewsletterDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function NewsletterView({ date, onBack, initialData }: Props) {
+  const [newsletter, setNewsletter] = useState<NewsletterDetail | null>(
+    initialData ?? null,
+  );
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialData) return; // skip fetch when data is provided
     setLoading(true);
     setError(null);
     fetchNewsletter(date)
       .then(setNewsletter)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [date]);
+  }, [date, initialData]);
+
+  const hasCover = Boolean(newsletter?.cover_image_url);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Top bar */}
+      {/* ── Hero header ───────────────────────────────────────────────── */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.75rem",
-          padding: "0.6rem 1rem",
-          borderBottom: "1px solid #1e1e2a",
+          position: "relative",
           flexShrink: 0,
+          minHeight: hasCover ? 220 : 110,
+          background: hasCover ? "transparent" : "#13131c",
+          borderBottom: "1px solid #1e1e2a",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-end",
         }}
       >
-        <button
-          onClick={onBack}
+        {/* Cover image */}
+        {hasCover && (
+          <img
+            src={newsletter!.cover_image_url!}
+            alt=""
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
+            }}
+          />
+        )}
+
+        {/* Gradient overlay */}
+        <div
           style={{
-            background: "none",
-            border: "1px solid #2a2a3a",
-            color: "#888899",
-            padding: "0.2rem 0.6rem",
-            borderRadius: 4,
-            cursor: "pointer",
-            fontSize: "0.75rem",
+            position: "absolute",
+            inset: 0,
+            background: hasCover
+              ? "linear-gradient(to bottom, rgba(13,13,20,0.3) 0%, rgba(13,13,20,0.92) 70%, #0d0d14 100%)"
+              : "none",
+          }}
+        />
+
+        {/* Back button — top left */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              position: "absolute",
+              top: "0.65rem",
+              left: "0.75rem",
+              background: "rgba(13,13,20,0.7)",
+              border: "1px solid #2a2a3a",
+              color: "#888899",
+              padding: "0.2rem 0.6rem",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontSize: "0.75rem",
+              backdropFilter: "blur(4px)",
+              zIndex: 2,
+            }}
+          >
+            ← Back
+          </button>
+        )}
+
+        {/* Text content */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            padding: "0 1.25rem 1rem",
           }}
         >
-          ← Back
-        </button>
-        <span style={{ fontSize: "0.78rem", color: "#55556a" }}>
-          {newsletter ? formatDate(newsletter.date) : formatDate(date)}
-        </span>
-        {newsletter && (
-          <span style={{ fontSize: "0.72rem", color: "#33334a" }}>
-            · {newsletter.event_count} event
-            {newsletter.event_count !== 1 ? "s" : ""}
-          </span>
-        )}
+          {/* Date + event count */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              marginBottom: "0.4rem",
+            }}
+          >
+            <span style={{ fontSize: "0.78rem", color: "#888899" }}>
+              {newsletter ? formatDate(newsletter.date) : formatDate(date)}
+            </span>
+            {newsletter && (
+              <span style={{ fontSize: "0.72rem", color: "#44445a" }}>
+                · {newsletter.event_count} event
+                {newsletter.event_count !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+
+          {/* Subject */}
+          {newsletter && (
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "1.35rem",
+                fontWeight: 700,
+                color: "#e8e8f0",
+                lineHeight: 1.3,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {newsletter.subject}
+            </h1>
+          )}
+
+          {/* Cover credit */}
+          {newsletter?.cover_image_credit && (
+            <p
+              style={{
+                margin: "0.45rem 0 0",
+                fontSize: "0.67rem",
+                color: "#44445a",
+                fontStyle: "italic",
+              }}
+            >
+              Image: {newsletter.cover_image_credit}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem 1rem" }}>
+      {/* ── Body ──────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem 1.25rem" }}>
         {loading && (
           <div
             style={{
@@ -98,17 +193,6 @@ export default function NewsletterView({ date, onBack }: Props) {
         )}
         {newsletter && !loading && (
           <div style={{ maxWidth: 680, margin: "0 auto" }}>
-            <h2
-              style={{
-                fontSize: "1.2rem",
-                fontWeight: 700,
-                color: "#e8e8f0",
-                marginBottom: "1.5rem",
-                lineHeight: 1.35,
-              }}
-            >
-              {newsletter.subject}
-            </h2>
             <div className="newsletter-body">
               <ReactMarkdown>{newsletter.body}</ReactMarkdown>
             </div>

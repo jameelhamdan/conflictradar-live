@@ -99,6 +99,9 @@ class Article(models.Model):
     sub_category = models.CharField(max_length=64, null=True, blank=True)
     processed_on = models.DateTimeField(null=True, blank=True)
 
+    # Media — populated during fetch (RSS) or process_articles (OG image fallback)
+    banner_image_url = models.URLField(max_length=512, null=True, blank=True)
+
     # Geocoding — populated by aggregate_events
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -154,6 +157,7 @@ class Event(models.Model):
     # References
     article_ids = models.JSONField(default=list)
     source_codes = models.JSONField(default=list)
+    sub_categories = models.JSONField(default=list, blank=True)
 
     updated_on = models.DateTimeField(auto_now=True)
     created_on = models.DateTimeField(auto_now_add=True)

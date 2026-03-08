@@ -106,6 +106,21 @@ class NewsletterListView(APIView):
         return Response({'results': serializer.data, 'count': newsletters.count()})
 
 
+class NewsletterLatestView(APIView):
+    """GET /api/newsletter/latest/ — retrieve the most recently sent newsletter"""
+
+    def get(self, request):
+        newsletter = DailyNewsletter.objects.filter(
+            status=DailyNewsletter.STATUS_SENT
+        ).first()
+        if not newsletter:
+            return Response(
+                {'detail': 'No newsletter available.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(NewsletterDetailSerializer(newsletter).data)
+
+
 class NewsletterDetailView(APIView):
     """GET /api/newsletter/<date>/ — retrieve a newsletter by date (YYYY-MM-DD)"""
 

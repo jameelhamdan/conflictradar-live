@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     import core.models
 
 
-class ArticleDatum(TypedDict):
+class _ArticleDatumRequired(TypedDict):
     source_url: str
     author: str
     author_slug: str
@@ -14,6 +14,11 @@ class ArticleDatum(TypedDict):
     content: str
     published_on: datetime.datetime
     extra_data: dict
+
+
+class ArticleDatum(_ArticleDatumRequired, total=False):
+    """Required base fields plus optional banner_image_url."""
+    banner_image_url: str
 
 
 class ClientServiceException(Exception):
