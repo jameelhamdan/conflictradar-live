@@ -1,12 +1,22 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import NewsletterList from "./NewsletterList";
 import NewsletterView from "./NewsletterView";
 import SiteHeader from "../SiteHeader";
+import { fetchLatestNewsletter } from "../../api/newsletter";
+import type { NewsletterDetail } from "../../api/newsletter";
+import SubscribeForm from "./SubscribeForm";
 
 export default function NewsletterPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [latestData, setLatestData] = useState<NewsletterDetail | null>(null);
+
+  useEffect(() => {
+    fetchLatestNewsletter()
+      .then((data) => { setLatestData(data); setSelectedDate(data.date); })
+      .catch(() => {/* no newsletters yet */});
+  }, []);
 
   return (
     <div
@@ -62,8 +72,9 @@ export default function NewsletterPage() {
             Past briefings
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
-            <NewsletterList onSelect={setSelectedDate} />
+            <NewsletterList onSelect={(date) => { setSelectedDate(date); setLatestData(null); }} />
           </div>
+          <SubscribeForm />
         </section>
 
         {/* Right column: reader */}
@@ -80,6 +91,7 @@ export default function NewsletterPage() {
             {selectedDate ? (
               <NewsletterView
                 date={selectedDate}
+                initialData={latestData ?? undefined}
                 onBack={() => setSelectedDate(null)}
               />
             ) : (
