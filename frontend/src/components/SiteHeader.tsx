@@ -20,6 +20,9 @@ export default function SiteHeader({ activePage }: { activePage?: string }) {
           .live
         </span>
       </a>
+      <span style={{ fontSize: '0.7rem', color: '#33334a', fontFamily: 'monospace' }}>
+        {__APP_VERSION__}
+      </span>
       <div style={{ flex: 1 }} />
       <a
         href="/about"
