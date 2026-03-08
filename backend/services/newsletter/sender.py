@@ -45,7 +45,8 @@ def send_newsletter(date_str: str | None = None) -> str:
     from django.utils import timezone
 
     from newsletter.models import DailyNewsletter, Subscriber
-    from services.email import get_email_service, EmailError
+    from services.email.providers import get_email_service
+    from services.email.mailer import send_newsletter_email
 
     if date_str:
         target_date = date.fromisoformat(date_str)
@@ -78,18 +79,9 @@ def send_newsletter(date_str: str | None = None) -> str:
     for sub in subscribers:
         unsubscribe_url = f"{base_url}/newsletter/unsubscribe/{sub.token}"
         html, text = _render_email(newsletter, date_str_display, base_url, unsubscribe_url)
-        try:
-            email_svc.send(
-                to=sub.email,
-                subject=newsletter.subject,
-                html=html,
-                text=text,
-                from_email=from_email,
-                headers={"List-Unsubscribe": f"<{unsubscribe_url}>"},
-            )
+        if send_newsletter_email(email_svc, sub, newsletter.subject, html, text, from_email, unsubscribe_url):
             sent += 1
-        except EmailError as exc:
-            logger.error("Failed to send newsletter to %s: %s", sub.email, exc)
+        else:
             errors += 1
 
     newsletter.status = DailyNewsletter.STATUS_SENT if errors == 0 else DailyNewsletter.STATUS_ERROR

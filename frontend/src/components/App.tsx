@@ -6,6 +6,7 @@ import EventList from "./events/EventList";
 import PriceTicker from "./events/PriceTicker";
 import { fetchEvents } from "../api/events";
 import { useSSE } from "../hooks/useSSE";
+import SubscribePopup from "./SubscribePopup";
 import { categoryColor, categoryShapeComponent } from "../constants";
 import type { EventSummary, EventFilters } from "../types";
 
@@ -40,7 +41,6 @@ export default function App() {
   const [filters, setFilters] = useState<EventFilters>({ category: "" });
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
   const [mounted, setMounted] = useState(false);
-
 
   const [isMobile, setIsMobile] = useState(false);
   const [mobileTab, setMobileTab] = useState<"map" | "list">("map");
@@ -237,6 +237,7 @@ export default function App() {
               >
                 Newsletter
               </a>
+              <SubscribePopup />
             </nav>
           )}
           {isMobile && (

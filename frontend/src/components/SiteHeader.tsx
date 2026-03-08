@@ -1,3 +1,7 @@
+'use client';
+
+import SubscribePopup from './SubscribePopup';
+
 export default function SiteHeader({ activePage }: { activePage?: string }) {
   return (
     <nav
@@ -50,6 +54,7 @@ export default function SiteHeader({ activePage }: { activePage?: string }) {
       >
         Newsletter
       </a>
+      <SubscribePopup />
     </nav>
-  )
+  );
 }

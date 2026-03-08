@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'accounts',
     'core',
     'newsletter',
+    'misc',
     'api',
     'services',
 ]
@@ -263,6 +264,7 @@ MIGRATION_MODULES = {
     "accounts": "migrations.accounts",
     "core": "migrations.core",
     "newsletter": "migrations.newsletter",
+    "misc": "migrations.misc",
 }
 
 AUTHENTICATION_BACKENDS = ['app.backends.ModelAuthBackend']

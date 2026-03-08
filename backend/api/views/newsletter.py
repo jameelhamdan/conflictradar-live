@@ -2,8 +2,6 @@
 import logging
 import uuid
 
-from django.conf import settings
-from django.template.loader import render_to_string
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -15,7 +13,7 @@ from ..serializers import (
     NewsletterListSerializer,
     SubscribeSerializer,
 )
-from services.email import get_email_service, EmailError
+from services.email.mailer import send_confirmation_email
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +24,7 @@ class SubscribeThrottle(AnonRateThrottle):
 
 class SubscribeView(APIView):
     """POST /api/newsletter/subscribe/"""
+    authentication_classes = []
     throttle_classes = [SubscribeThrottle]
 
     def post(self, request):
@@ -39,8 +38,8 @@ class SubscribeView(APIView):
         if existing:
             if existing.is_active:
                 return Response(
-                    {'detail': 'This email is already subscribed.'},
-                    status=status.HTTP_200_OK,
+                    {'detail': 'Please check your email to confirm your subscription.'},
+                    status=status.HTTP_201_CREATED,
                 )
             existing.token = uuid.uuid4()
             existing.is_active = False
@@ -51,7 +50,7 @@ class SubscribeView(APIView):
         else:
             sub = Subscriber.objects.create(email=email)
 
-        _send_confirmation_email(sub)
+        send_confirmation_email(sub)
         return Response(
             {'detail': 'Please check your email to confirm your subscription.'},
             status=status.HTTP_201_CREATED,
@@ -134,23 +133,3 @@ class NewsletterDetailView(APIView):
             )
         return Response(NewsletterDetailSerializer(newsletter).data)
 
-
-def _send_confirmation_email(sub: Subscriber) -> None:
-    base_url = getattr(settings, 'NEWSLETTER_BASE_URL', 'http://localhost')
-    confirm_url = f'{base_url}/newsletter/confirm/{sub.token}'
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'newsletter@localhost')
-
-    context = {'confirm_url': confirm_url}
-    html = render_to_string('newsletter/confirm_email.html', context)
-    text = render_to_string('newsletter/confirm_email.txt', context)
-
-    try:
-        get_email_service().send(
-            to=sub.email,
-            subject='Confirm your subscription — conflictradar.live',
-            html=html,
-            text=text,
-            from_email=from_email,
-        )
-    except EmailError as exc:
-        logger.error('Failed to send confirmation email to %s: %s', sub.email, exc)
