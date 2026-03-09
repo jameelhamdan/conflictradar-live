@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchNewsletters } from "../../api/newsletter";
+import { useLanguage } from "../../contexts/LanguageContext";
 import type { NewsletterSummary } from "../../api/newsletter";
 
 interface Props {
@@ -17,6 +18,7 @@ function formatDate(dateStr: string): string {
 }
 
 export default function NewsletterList({ onSelect }: Props) {
+  const { t } = useLanguage();
   const [newsletters, setNewsletters] = useState<NewsletterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export default function NewsletterList({ onSelect }: Props) {
           fontSize: "0.85rem",
         }}
       >
-        Loading…
+        {t.loading}
       </div>
     );
   }
@@ -68,7 +70,7 @@ export default function NewsletterList({ onSelect }: Props) {
           fontSize: "0.85rem",
         }}
       >
-        No newsletters published yet.
+        {t.noBriefingsYet}
       </div>
     );
   }
@@ -103,7 +105,7 @@ export default function NewsletterList({ onSelect }: Props) {
             {formatDate(nl.date)}
             {nl.event_count > 0 && (
               <span style={{ marginLeft: "0.5rem", color: "#33334a" }}>
-                · {nl.event_count} event{nl.event_count !== 1 ? "s" : ""}
+                · {t.eventCount(nl.event_count)}
               </span>
             )}
           </div>

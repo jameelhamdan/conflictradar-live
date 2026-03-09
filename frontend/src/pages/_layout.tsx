@@ -24,6 +24,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Theme */}
         <meta name="theme-color" content="#0f0f13" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        {/* Arabic font — activated by CSS :lang(ar) / [dir="rtl"] rule */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {/* Apply lang/dir from cookie before first paint to prevent RTL flicker */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var m=document.cookie.match(/(?:^|;\\s*)lang=([^;]+)/);var l=m&&(m[1]==='ar'||m[1]==='en')?m[1]:null;if(!l){var n=(navigator.language||(navigator.languages&&navigator.languages[0])||'en');l=n.toLowerCase().startsWith('ar')?'ar':'en';}document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr';}catch(e){}})();` }} />
       </head>
       <body>
         {children}

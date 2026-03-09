@@ -1,7 +1,25 @@
 'use client'
 
 import { categoryColor, categoryIcon, intensityColor } from '../../constants'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { UI } from '../../i18n/strings'
+import { categoryLabel } from '../../i18n/categories'
 import type { EventSummary } from '../../types'
+
+/**
+ * Pick a localized field from an object that carries `field` (en) and `field_ar` (ar).
+ * Falls back to the base English field if the Arabic value is absent.
+ */
+export function useLocalizedField() {
+  const { lang } = useLanguage()
+  return (obj: Record<string, unknown>, field: string): string => {
+    if (lang === 'ar') {
+      const arVal = obj[`${field}_ar`]
+      if (typeof arVal === 'string' && arVal) return arVal
+    }
+    return String(obj[field] ?? '')
+  }
+}
 
 function IntensityBar({ value, compact }: { value: number; compact: boolean }) {
   const color = intensityColor(value)
@@ -29,13 +47,15 @@ function IntensityBar({ value, compact }: { value: number; compact: boolean }) {
   )
 }
 
-export function timeAgo(iso: string): string {
+export function timeAgo(iso: string, lang: 'en' | 'ar' = 'en'): string {
+  const t = UI[lang]
   const ms = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(ms / 60000)
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 1) return t.justNow
+  if (mins < 60) return t.minutesAgo(mins)
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+  if (hrs < 24) return t.hoursAgo(hrs)
+  return t.daysAgo(Math.floor(hrs / 24))
 }
 
 interface CategoryBadgeProps {
@@ -44,6 +64,7 @@ interface CategoryBadgeProps {
 }
 
 export function CategoryBadge({ category, compact = false }: CategoryBadgeProps) {
+  const { lang } = useLanguage()
   const color = categoryColor(category)
   const Icon = categoryIcon(category)
   const iconSize = compact ? 8 : 10
@@ -57,7 +78,7 @@ export function CategoryBadge({ category, compact = false }: CategoryBadgeProps)
       background: color + '33', color,
     }}>
       <Icon size={iconSize} color={color} />
-      {category}
+      {categoryLabel(lang, category)}
     </span>
   )
 }
@@ -69,12 +90,15 @@ interface EventMetaProps {
 }
 
 export function EventMeta({ event, compact = false, showLocation = true }: EventMetaProps) {
+  const { t } = useLanguage()
+  const pick = useLocalizedField()
+  const locationName = pick(event as unknown as Record<string, unknown>, 'location_name')
   const fontSize = compact ? '0.7rem' : '0.77rem'
   return (
     <div style={{ display: 'flex', gap: '0.4rem', fontSize, color: '#888', flexWrap: 'wrap' }}>
-      {showLocation && <span style={{ color: '#aaa' }}>📍 {event.location_name}</span>}
+      {showLocation && <span style={{ color: '#aaa' }}>📍 {locationName}</span>}
       {showLocation && <span style={{ color: '#444' }}>·</span>}
-      <span>{event.article_count} article{event.article_count !== 1 ? 's' : ''}</span>
+      <span>{t.articleCount(event.article_count)}</span>
       {event.avg_intensity != null && (
         <>
           <span style={{ color: '#444' }}>·</span>

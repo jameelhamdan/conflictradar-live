@@ -15,7 +15,9 @@ export interface EventSummary {
   sub_categories: string[]
   avg_intensity: number | null
   title: string
+  title_ar: string
   location_name: string
+  location_name_ar: string
   article_count: number
   started_at: string
 }
@@ -23,6 +25,7 @@ export interface EventSummary {
 export interface Article {
   id: string
   title: string
+  title_ar: string
   source_url: string
   source_code: string
   published_on: string

@@ -74,6 +74,7 @@ class ArticleCleaner:
             category=analysis.category,
             sub_category=analysis.sub_category,
             llm_data=analysis.llm_data,
+            translations=analysis.translations,
         )
 
     def clean_batch(self, documents: Sequence[ArticleDocument]) -> list[ArticleFeatures]:
@@ -100,5 +101,6 @@ class ArticleCleaner:
                 category=analysis.category,
                 sub_category=analysis.sub_category,
                 llm_data=analysis.llm_data,
+                translations=analysis.translations,
             ))
         return results

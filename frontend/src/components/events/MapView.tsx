@@ -13,10 +13,11 @@ import {
 } from "react-leaflet";
 import { categoryColor } from "../../constants";
 import { categoryShapeSvg } from "../shapes";
-import { timeAgo, CategoryBadge, EventMeta } from "./EventUI";
-import NotamOverlay from "./NotamOverlay";
-import EarthquakeLayer from "./EarthquakeLayer";
+import { timeAgo, CategoryBadge, EventMeta, useLocalizedField } from "./EventUI";
+import NotamOverlay from "../layers/NotamOverlay";
+import EarthquakeLayer from "../layers/EarthquakeLayer";
 import { fetchStaticPoints } from "../../api/streams";
+import { useLanguage } from "../../contexts/LanguageContext";
 import type { EventSummary, StaticPoint, StaticPointType } from "../../types";
 
 // --- Static point helpers ---
@@ -272,6 +273,8 @@ function ClusteredMarkers({
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
   useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const { lang } = useLanguage();
+  const pick = useLocalizedField();
 
   const visibleStatic = showStaticPoints ? staticPoints : [];
   const clusters = buildClusters(events, visibleStatic, zoom);
@@ -337,7 +340,7 @@ function ClusteredMarkers({
                     >
                       <CategoryBadge category={ev.category} compact />
                       <span style={{ fontSize: "0.7rem", color: "#666" }}>
-                        {timeAgo(ev.started_at)}
+                        {timeAgo(ev.started_at, lang)}
                       </span>
                     </div>
                     <div
@@ -349,7 +352,7 @@ function ClusteredMarkers({
                         color: "#d8d8e8",
                       }}
                     >
-                      {ev.title}
+                      {pick(ev as unknown as Record<string, unknown>, "title")}
                     </div>
                     <EventMeta event={ev} compact />
                   </div>
@@ -430,7 +433,7 @@ function ClusteredMarkers({
                       >
                         <CategoryBadge category={ev.category} compact />
                         <span style={{ fontSize: "0.68rem", color: "#555" }}>
-                          {timeAgo(ev.started_at)}
+                          {timeAgo(ev.started_at, lang)}
                         </span>
                       </div>
                       <div
@@ -442,7 +445,7 @@ function ClusteredMarkers({
                           marginBottom: "0.2rem",
                         }}
                       >
-                        {ev.title}
+                        {pick(ev as unknown as Record<string, unknown>, "title")}
                       </div>
                       <EventMeta event={ev} compact showLocation={false} />
                     </div>
@@ -508,7 +511,7 @@ export default function MapView({
         [90, 180],
       ]}
       maxBoundsViscosity={1.0}
-      style={{ height: "100%", width: "100%", background: "#191920" }}
+      style={{ height: "100%", width: "100%", background: "#191920", direction: "ltr" }}
       zoomControl={true}
     >
       <TileLayer

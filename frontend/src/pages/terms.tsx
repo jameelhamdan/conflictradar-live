@@ -30,9 +30,34 @@ const UL = {
 } as const
 
 import SiteHeader from '../components/SiteHeader'
+import { LanguageProvider, useLanguage } from '../contexts/LanguageContext'
+
+function TermsHeader() {
+  const { t } = useLanguage()
+  return (
+    <header style={{ marginBottom: '3rem' }}>
+      <h1 style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#e8e8f0', marginBottom: '0.5rem' }}>
+        {t.termsPageTitle}
+      </h1>
+      <p style={{ color: '#44445a', fontSize: '0.82rem' }}>{t.lastUpdated} {LAST_UPDATED}</p>
+    </header>
+  )
+}
+
+function TermsFooter() {
+  const { t } = useLanguage()
+  return (
+    <footer style={{ borderTop: '1px solid #1a1a26', padding: '1.25rem 2rem', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.78rem', color: '#44445a' }}>
+      <a href="/terms" style={{ color: '#7c9ef8', textDecoration: 'none' }}>{t.termsLink}</a>
+      <a href="/privacy" style={{ color: '#44445a', textDecoration: 'none' }}>{t.privacyLink}</a>
+      <a href="/about" style={{ color: '#44445a', textDecoration: 'none' }}>{t.about}</a>
+    </footer>
+  )
+}
 
 export default function TermsPage() {
   return (
+    <LanguageProvider>
     <div style={{ minHeight: '100vh', background: '#0f0f13', color: '#e0e0e0' }}>
       <title>Terms of Service — conflictradar.live</title>
       <meta name="description" content="Terms of Service and Disclaimer for conflictradar.live." />
@@ -41,12 +66,7 @@ export default function TermsPage() {
       <SiteHeader />
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '3rem 2rem 5rem' }}>
-        <header style={{ marginBottom: '3rem' }}>
-          <h1 style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#e8e8f0', marginBottom: '0.5rem' }}>
-            Terms of Service
-          </h1>
-          <p style={{ color: '#44445a', fontSize: '0.82rem' }}>Last updated: {LAST_UPDATED}</p>
-        </header>
+        <TermsHeader />
 
         <section style={SECTION}>
           <h2 style={H2}>1. Acceptance of terms</h2>
@@ -153,17 +173,9 @@ export default function TermsPage() {
         </section>
       </div>
 
-      <footer style={{
-        borderTop: '1px solid #1a1a26',
-        padding: '1.25rem 2rem',
-        display: 'flex', gap: '1.25rem', flexWrap: 'wrap',
-        fontSize: '0.78rem', color: '#44445a',
-      }}>
-        <a href="/terms" style={{ color: '#7c9ef8', textDecoration: 'none' }}>Terms of Service</a>
-        <a href="/privacy" style={{ color: '#44445a', textDecoration: 'none' }}>Privacy Policy</a>
-        <a href="/about" style={{ color: '#44445a', textDecoration: 'none' }}>About</a>
-      </footer>
+      <TermsFooter />
     </div>
+    </LanguageProvider>
   )
 }
 

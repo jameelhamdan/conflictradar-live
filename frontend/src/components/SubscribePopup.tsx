@@ -3,12 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useSubscribe } from '../hooks/useSubscribe';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function SubscribePopup() {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const { email, setEmail, status, message, handleSubmit, reset } = useSubscribe();
+  const { t } = useLanguage();
 
   function toggle() {
     if (!open) {
@@ -56,15 +58,15 @@ export default function SubscribePopup() {
             }}
           >
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#e8e8f0', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-              Daily Briefings
+              {t.subscribeTitle}
             </div>
             <p style={{ fontSize: '0.78rem', color: '#888899', margin: '0 0 0.75rem', lineHeight: 1.5 }}>
-              Get the day's top conflict intelligence in your inbox.
+              {t.subscribeTagline}
             </p>
 
             {status === 'success' ? (
               <p style={{ fontSize: '0.8rem', color: '#52c8a0', margin: 0, lineHeight: 1.5 }}>
-                {message ?? 'Check your email to confirm.'}
+                {message ?? t.checkEmailConfirm}
               </p>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -103,7 +105,7 @@ export default function SubscribePopup() {
                     opacity: status === 'loading' ? 0.6 : 1,
                   }}
                 >
-                  {status === 'loading' ? 'Subscribing…' : 'Subscribe'}
+                  {status === 'loading' ? t.subscribingLabel : t.subscribe}
                 </button>
                 {status === 'error' && message && (
                   <p style={{ fontSize: '0.73rem', color: '#e05252', margin: 0 }}>{message}</p>
@@ -134,7 +136,7 @@ export default function SubscribePopup() {
           flexShrink: 0,
         }}
       >
-        Subscribe
+        {t.subscribe}
       </button>
       {panel}
     </>

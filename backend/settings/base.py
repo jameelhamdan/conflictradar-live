@@ -91,6 +91,20 @@ TEMPLATES = [
     },
 ]
 
+SENTRY_DSN = config('DSN', default='')
+
+if SENTRY_DSN:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        # Add data like request headers and IP for users,
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=False,  # Explicitly disable PII
+        max_request_body_size="never",  # Don't send request bodies
+        include_source_context=False,  # Don't send source code context
+        include_local_variables=False,  # Don't send local variable values
+    )
 
 LOGGING = {
     'version': 1,

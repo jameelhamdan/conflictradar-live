@@ -5,9 +5,11 @@ import NewsletterList from "./NewsletterList";
 import NewsletterView from "./NewsletterView";
 import SiteHeader from "../SiteHeader";
 import { fetchLatestNewsletter } from "../../api/newsletter";
+import { useLanguage } from "../../contexts/LanguageContext";
 import type { NewsletterDetail } from "../../api/newsletter";
 
 export default function NewsletterPage() {
+  const { t } = useLanguage();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [latestData, setLatestData] = useState<NewsletterDetail | null>(null);
 
@@ -68,7 +70,7 @@ export default function NewsletterPage() {
               textTransform: "uppercase",
             }}
           >
-            Past briefings
+            {t.pastBriefings}
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
             <NewsletterList onSelect={(date) => { setSelectedDate(date); setLatestData(null); }} />
@@ -90,7 +92,6 @@ export default function NewsletterPage() {
               <NewsletterView
                 date={selectedDate}
                 initialData={latestData ?? undefined}
-                onBack={() => setSelectedDate(null)}
               />
             ) : (
               <div
@@ -103,7 +104,7 @@ export default function NewsletterPage() {
                   fontSize: "0.9rem",
                 }}
               >
-                Select a briefing on the left to read.
+                {t.selectBriefing}
               </div>
             )}
           </div>

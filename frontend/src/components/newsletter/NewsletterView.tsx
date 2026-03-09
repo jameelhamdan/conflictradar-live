@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { fetchNewsletter } from "../../api/newsletter";
+import { useLanguage } from "../../contexts/LanguageContext";
 import type { NewsletterDetail } from "../../api/newsletter";
 
 interface Props {
   date: string;
-  onBack?: () => void;
   /** If provided, skips the internal fetch and uses this data directly. */
   initialData?: NewsletterDetail;
 }
@@ -20,7 +20,8 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function NewsletterView({ date, onBack, initialData }: Props) {
+export default function NewsletterView({ date, initialData }: Props) {
+  const { t } = useLanguage();
   const [newsletter, setNewsletter] = useState<NewsletterDetail | null>(
     initialData ?? null,
   );
@@ -82,29 +83,6 @@ export default function NewsletterView({ date, onBack, initialData }: Props) {
           }}
         />
 
-        {/* Back button — top left */}
-        {onBack && (
-          <button
-            onClick={onBack}
-            style={{
-              position: "absolute",
-              top: "0.65rem",
-              left: "0.75rem",
-              background: "rgba(13,13,20,0.7)",
-              border: "1px solid #2a2a3a",
-              color: "#888899",
-              padding: "0.2rem 0.6rem",
-              borderRadius: 4,
-              cursor: "pointer",
-              fontSize: "0.75rem",
-              backdropFilter: "blur(4px)",
-              zIndex: 2,
-            }}
-          >
-            ← Back
-          </button>
-        )}
-
         {/* Text content */}
         <div
           style={{
@@ -127,8 +105,7 @@ export default function NewsletterView({ date, onBack, initialData }: Props) {
             </span>
             {newsletter && (
               <span style={{ fontSize: "0.72rem", color: "#44445a" }}>
-                · {newsletter.event_count} event
-                {newsletter.event_count !== 1 ? "s" : ""}
+                · {t.eventCount(newsletter.event_count)}
               </span>
             )}
           </div>
@@ -159,7 +136,7 @@ export default function NewsletterView({ date, onBack, initialData }: Props) {
                 fontStyle: "italic",
               }}
             >
-              Image: {newsletter.cover_image_credit}
+              {t.imageCredit} {newsletter.cover_image_credit}
             </p>
           )}
         </div>
@@ -176,7 +153,7 @@ export default function NewsletterView({ date, onBack, initialData }: Props) {
               paddingTop: "2rem",
             }}
           >
-            Loading…
+            {t.loading}
           </div>
         )}
         {error && (

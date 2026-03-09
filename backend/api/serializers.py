@@ -8,12 +8,17 @@ from newsletter.models import DailyNewsletter
 
 class ArticleSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
+    title_ar = serializers.SerializerMethodField()
+
+    def get_title_ar(self, obj):
+        return (getattr(obj, 'translations', None) or {}).get('ar', {}).get('title') or obj.title
 
     class Meta:
         model = Article
         fields = [
             'id',
             'title',
+            'title_ar',
             'source_code',
             'source_url',
             'category',
@@ -25,15 +30,25 @@ class ArticleSerializer(serializers.ModelSerializer):
 
 class EventSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
+    title_ar = serializers.SerializerMethodField()
+    location_name_ar = serializers.SerializerMethodField()
+
+    def get_title_ar(self, obj):
+        return (getattr(obj, 'translations', None) or {}).get('ar', {}).get('title') or obj.title
+
+    def get_location_name_ar(self, obj):
+        return (getattr(obj, 'translations', None) or {}).get('ar', {}).get('location_name') or obj.location_name
 
     class Meta:
         model = Event
         fields = [
             'id',
             'title',
+            'title_ar',
             'category',
             'sub_categories',
             'location_name',
+            'location_name_ar',
             'latitude',
             'longitude',
             'started_at',

@@ -3,8 +3,11 @@
 import { useState } from 'react'
 import { fetchEventDetail } from '../../api/events'
 import { categoryColor } from '../../constants'
-import { timeAgo, CategoryBadge, EventMeta } from './EventUI'
+import { timeAgo, CategoryBadge, EventMeta, useLocalizedField } from './EventUI'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { subCategoryLabel } from '../../i18n/categories'
 import type { EventSummary, Article } from '../../types'
+
 
 interface EventCardProps {
   event: EventSummary
@@ -13,6 +16,8 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, selected, onSelect }: EventCardProps) {
+  const { lang, t } = useLanguage()
+  const pick = useLocalizedField()
   const [articles, setArticles] = useState<Article[] | null>(null)
   const [loadingArticles, setLoadingArticles] = useState(false)
 
@@ -50,15 +55,15 @@ export default function EventCard({ event, selected, onSelect }: EventCardProps)
               fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: 99,
               background: '#2a2a3a', color: '#aaa', fontWeight: 500,
             }}>
-              {sub}
+              {subCategoryLabel(lang, sub)}
             </span>
           ))}
         </div>
-        <span style={{ fontSize: '0.75rem', color: '#666' }}>{timeAgo(event.started_at)}</span>
+        <span style={{ fontSize: '0.75rem', color: '#666' }}>{timeAgo(event.started_at, lang)}</span>
       </div>
 
       <div style={{ fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.35, marginBottom: '0.4rem', color: '#d8d8e8' }}>
-        {event.title}
+        {pick(event as unknown as Record<string, unknown>, 'title')}
       </div>
 
       <div style={{ marginBottom: '0.4rem' }}>
@@ -69,7 +74,7 @@ export default function EventCard({ event, selected, onSelect }: EventCardProps)
         onClick={toggleArticles}
         style={{ background: 'none', border: 'none', color: '#5577cc', fontSize: '0.75rem', cursor: 'pointer', padding: 0 }}
       >
-        {loadingArticles ? 'Loading…' : articles ? 'Hide articles ▲' : 'Show articles ▼'}
+        {loadingArticles ? t.loading : articles ? t.hideArticles : t.showArticles}
       </button>
 
       {articles && (
@@ -82,7 +87,7 @@ export default function EventCard({ event, selected, onSelect }: EventCardProps)
                 rel="noopener noreferrer"
                 style={{ color: '#7c9ef8', textDecoration: 'none', fontSize: '0.82rem' }}
               >
-                {a.title}
+                {pick(a as unknown as Record<string, unknown>, 'title')}
               </a>
               <span style={{ color: '#666', fontSize: '0.73rem' }}>
                 {a.source_code} · {new Date(a.published_on).toLocaleString()}
@@ -90,7 +95,7 @@ export default function EventCard({ event, selected, onSelect }: EventCardProps)
             </li>
           ))}
           {articles.length === 0 && (
-            <li style={{ color: '#666', fontSize: '0.8rem' }}>No articles found.</li>
+            <li style={{ color: '#666', fontSize: '0.8rem' }}>{t.noEvents}</li>
           )}
         </ul>
       )}

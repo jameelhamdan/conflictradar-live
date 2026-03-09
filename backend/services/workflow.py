@@ -114,11 +114,13 @@ class Workflow:
             article.sub_category = features.sub_category
             article.processed_on = timezone.now()
             article.extra_data = {**(article.extra_data or {}), 'llm': features.llm_data}
+            article.translations = features.translations
 
             # Best-effort: fetch og:image if no banner set yet and URL is reachable
             update_fields = [
                 'entities', 'sentiment', 'location', 'latitude', 'longitude',
-                'event_intensity', 'category', 'sub_category', 'processed_on', 'extra_data',
+                'event_intensity', 'category', 'sub_category', 'processed_on',
+                'extra_data', 'translations',
             ]
             if not article.banner_image_url and article.source_url and article.source_url.startswith('https://'):
                 og = _fetch_og_image(article.source_url)
@@ -200,6 +202,22 @@ class Workflow:
             lat = round(sum(lats) / len(lats), 6) if lats else representative.latitude
             lng = round(sum(lngs) / len(lngs), 6) if lngs else representative.longitude
 
+            # Build event translations subdocument from representative article.
+            # For each language in the representative's translations, copy the title
+            # and build location_name from city + country in that language.
+            rep_translations = getattr(representative, 'translations', {}) or {}
+            event_translations: dict = {}
+            for lang, fields in rep_translations.items():
+                if not isinstance(fields, dict):
+                    continue
+                lang_city = fields.get('city') or ''
+                lang_country = fields.get('country') or ''
+                lang_location = ', '.join(p for p in [lang_city, lang_country] if p) or location
+                event_translations[lang] = {
+                    'title': fields.get('title') or representative.title,
+                    'location_name': lang_location,
+                }
+
             # Upsert: match on location_name + calendar day.
             # Use explicit datetime range — MongoDB backend does not support __date lookups.
             day_start = datetime(started_at.year, started_at.month, started_at.day, tzinfo=started_at.tzinfo)
@@ -226,6 +244,7 @@ class Workflow:
                     article_ids=article_ids,
                     source_codes=source_codes,
                     sub_categories=sub_categories,
+                    translations=event_translations,
                 )
                 created_count += 1
                 logger.info(f'[aggregate] Created  {location} [{category}] — {len(group)} article(s)')
@@ -240,6 +259,7 @@ class Workflow:
                 event.article_ids = article_ids
                 event.source_codes = source_codes
                 event.sub_categories = sub_categories
+                event.translations = event_translations
                 event.save()
                 updated_count += 1
                 logger.info(f'[aggregate] Updated  {location} [{category}] — {len(group)} article(s)')

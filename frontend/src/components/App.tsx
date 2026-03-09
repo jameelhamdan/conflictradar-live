@@ -6,8 +6,10 @@ import EventList from "./events/EventList";
 import PriceTicker from "./events/PriceTicker";
 import { fetchEvents } from "../api/events";
 import { useSSE } from "../hooks/useSSE";
-import SubscribePopup from "./SubscribePopup";
+import SiteHeader from "./SiteHeader";
 import { categoryColor, categoryShapeComponent } from "../constants";
+import { useLanguage } from "../contexts/LanguageContext";
+import { categoryLabel } from "../i18n/categories";
 import type { EventSummary, EventFilters } from "../types";
 
 const MapView = lazy(() => import("./events/MapView"));
@@ -34,9 +36,9 @@ const QUICK_FILTERS = [
 type QuickFilter = (typeof QUICK_FILTERS)[number]["value"] | "";
 
 export default function App() {
+  const { lang, t } = useLanguage();
+
   const [events, setEvents] = useState<EventSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<EventFilters>({ category: "" });
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
@@ -85,11 +87,8 @@ export default function App() {
       }
       const data = await fetchEvents(effectiveFilters);
       setEvents(data.results);
-      setError(null);
     } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
+      console.error(e);
     }
   }, [filters, quickFilter]);
 
@@ -158,88 +157,8 @@ export default function App() {
           borderBottom: "1px solid #1e1e2a",
         }}
       >
-        {/* Row 1 */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            padding: "0 1rem",
-            height: 44,
-            borderBottom: "1px solid #1a1a26",
-            overflowX: "auto",
-            scrollbarWidth: "none",
-          }}
-        >
-          <a
-            href="/"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              textDecoration: "none",
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: "0.95rem",
-                letterSpacing: "-0.01em",
-                color: "#e8e8f0",
-              }}
-            >
-              conflictradar
-            </span>
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: "0.95rem",
-                letterSpacing: "-0.01em",
-                color: "#e05252",
-              }}
-            >
-              .live
-            </span>
-          </a>
-
-          {!isMobile && (
-            <nav
-              style={{
-                display: "flex",
-                gap: "0.15rem",
-                alignItems: "center",
-                flexShrink: 0,
-              }}
-            >
-              <a
-                href="/about"
-                style={{
-                  color: "#55556a",
-                  fontSize: "0.8rem",
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  padding: "0.2rem 0.45rem",
-                  borderRadius: 4,
-                }}
-              >
-                About
-              </a>
-              <a
-                href="/newsletter"
-                style={{
-                  color: "#55556a",
-                  fontSize: "0.8rem",
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  padding: "0.2rem 0.45rem",
-                  borderRadius: 4,
-                }}
-              >
-                Newsletter
-              </a>
-              <SubscribePopup />
-            </nav>
-          )}
+        <SiteHeader showNav={!isMobile}>
+          {/* Mobile sidebar toggle */}
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -256,7 +175,6 @@ export default function App() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                marginLeft: "0.25rem",
                 transition: "color 0.12s",
                 flexShrink: 0,
               }}
@@ -264,15 +182,7 @@ export default function App() {
               {sidebarOpen ? "✕" : "☰"}
             </button>
           )}
-          <div
-            style={{
-              width: 1,
-              height: 18,
-              background: "#1e1e2a",
-              flexShrink: 0,
-            }}
-          />
-
+          <div style={{ width: 1, height: 18, background: "#1e1e2a", flexShrink: 0 }} />
           {/* Time filters */}
           <div
             style={{
@@ -284,7 +194,6 @@ export default function App() {
               scrollbarWidth: "none",
             }}
           >
-            {/* Quick preset buttons */}
             {QUICK_FILTERS.map((qf) => {
               const active = quickFilter === qf.value;
               return (
@@ -305,15 +214,13 @@ export default function App() {
                     cursor: "pointer",
                     whiteSpace: "nowrap",
                     flexShrink: 0,
-                    transition:
-                      "color 0.12s, background 0.12s, border-color 0.12s",
+                    transition: "color 0.12s, background 0.12s, border-color 0.12s",
                   }}
                 >
                   {qf.label}
                 </button>
               );
             })}
-
             {quickFilter && (
               <button
                 onClick={clearQuickFilter}
@@ -334,22 +241,7 @@ export default function App() {
               </button>
             )}
           </div>
-
-          <span
-            style={{
-              fontSize: "0.76rem",
-              color: "#44445a",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-          >
-            {loading
-              ? "Loading…"
-              : error
-                ? `⚠ ${error}`
-                : `${events.length} events`}
-          </span>
-        </div>
+        </SiteHeader>
 
         {/* Row 2 — category tabs */}
         <div
@@ -407,7 +299,7 @@ export default function App() {
                     ◉
                   </span>
                 )}
-                {tab.label}
+                {categoryLabel(lang, tab.value || "all")}
               </button>
             );
           })}
@@ -466,21 +358,21 @@ export default function App() {
                 [
                   {
                     key: "notams",
-                    label: "NOTAMs",
+                    label: t.notams,
                     color: "#ff6644",
                     value: showNotams,
                     set: setShowNotams,
                   },
                   {
                     key: "earthquakes",
-                    label: "Earthquakes",
+                    label: t.earthquakes,
                     color: "#7c6ef8",
                     value: showEarthquakes,
                     set: setShowEarthquakes,
                   },
                   {
                     key: "staticPoints",
-                    label: "Locations",
+                    label: t.locations,
                     color: "#4fc3f7",
                     value: showStaticPoints,
                     set: setShowStaticPoints,
@@ -585,9 +477,7 @@ export default function App() {
                 <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>
                   {tab === "map" ? "⬡" : "☰"}
                 </span>
-                {tab === "map"
-                  ? "Map"
-                  : `Events${events.length ? ` (${events.length})` : ""}`}
+                {tab === "map" ? t.mapTab : t.listTab}
               </button>
             );
           })}
@@ -610,7 +500,7 @@ export default function App() {
             }}
           >
             <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>✉</span>
-            Briefings
+            {t.briefingsTab}
           </a>
         </nav>
       )}

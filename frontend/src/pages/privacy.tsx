@@ -30,9 +30,34 @@ const UL = {
 } as const
 
 import SiteHeader from '../components/SiteHeader'
+import { LanguageProvider, useLanguage } from '../contexts/LanguageContext'
+
+function PrivacyHeader() {
+  const { t } = useLanguage()
+  return (
+    <header style={{ marginBottom: '3rem' }}>
+      <h1 style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#e8e8f0', marginBottom: '0.5rem' }}>
+        {t.privacyPageTitle}
+      </h1>
+      <p style={{ color: '#44445a', fontSize: '0.82rem' }}>{t.lastUpdated} {LAST_UPDATED}</p>
+    </header>
+  )
+}
+
+function PrivacyFooter() {
+  const { t } = useLanguage()
+  return (
+    <footer style={{ borderTop: '1px solid #1a1a26', padding: '1.25rem 2rem', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.78rem', color: '#44445a' }}>
+      <a href="/terms" style={{ color: '#44445a', textDecoration: 'none' }}>{t.termsLink}</a>
+      <a href="/privacy" style={{ color: '#7c9ef8', textDecoration: 'none' }}>{t.privacyLink}</a>
+      <a href="/about" style={{ color: '#44445a', textDecoration: 'none' }}>{t.about}</a>
+    </footer>
+  )
+}
 
 export default function PrivacyPage() {
   return (
+    <LanguageProvider>
     <div style={{ minHeight: '100vh', background: '#0f0f13', color: '#e0e0e0' }}>
       <title>Privacy Policy — conflictradar.live</title>
       <meta name="description" content="Privacy Policy and Cookie Policy for conflictradar.live." />
@@ -41,12 +66,7 @@ export default function PrivacyPage() {
       <SiteHeader />
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '3rem 2rem 5rem' }}>
-        <header style={{ marginBottom: '3rem' }}>
-          <h1 style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#e8e8f0', marginBottom: '0.5rem' }}>
-            Privacy Policy
-          </h1>
-          <p style={{ color: '#44445a', fontSize: '0.82rem' }}>Last updated: {LAST_UPDATED}</p>
-        </header>
+        <PrivacyHeader />
 
         <section style={SECTION}>
           <h2 style={H2}>1. Who we are</h2>
@@ -151,17 +171,9 @@ export default function PrivacyPage() {
         </section>
       </div>
 
-      <footer style={{
-        borderTop: '1px solid #1a1a26',
-        padding: '1.25rem 2rem',
-        display: 'flex', gap: '1.25rem', flexWrap: 'wrap',
-        fontSize: '0.78rem', color: '#44445a',
-      }}>
-        <a href="/terms" style={{ color: '#44445a', textDecoration: 'none' }}>Terms of Service</a>
-        <a href="/privacy" style={{ color: '#7c9ef8', textDecoration: 'none' }}>Privacy Policy</a>
-        <a href="/about" style={{ color: '#44445a', textDecoration: 'none' }}>About</a>
-      </footer>
+      <PrivacyFooter />
     </div>
+    </LanguageProvider>
   )
 }
 

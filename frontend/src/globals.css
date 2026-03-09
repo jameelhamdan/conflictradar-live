@@ -10,6 +10,12 @@ body {
   color: #e0e0e0;
 }
 
+/* Arabic font — applied when document dir is rtl or lang is ar */
+:lang(ar),
+[dir="rtl"] {
+  font-family: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
+}
+
 a {
   text-decoration: none;
 }
@@ -86,4 +92,24 @@ button {
 
 .leaflet-popup-tip-container {
   display: none !important;
+}
+
+/* Unified thin scrollbar — all overflow containers */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a3a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4e;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a3a transparent;
 }

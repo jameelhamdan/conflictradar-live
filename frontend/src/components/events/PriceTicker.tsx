@@ -2,15 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { fetchPricesLatest } from '../../api/streams'
-import type { PriceTick, StreamKey, SSEEvent } from '../../types'
-
-const STREAM_KEY_LABELS: Record<StreamKey, string> = {
-  stock:     'Stocks',
-  crypto:    'Crypto',
-  commodity: 'Commodities',
-  forex:     'Forex',
-  bond:      'Bonds',
-}
+import { useLanguage } from '../../contexts/LanguageContext'
+import type { PriceTick, StreamKey } from '../../types'
 
 const STREAM_KEYS: StreamKey[] = ['stock', 'crypto', 'commodity', 'forex', 'bond']
 
@@ -67,6 +60,7 @@ interface PriceTickerProps {
 }
 
 export default function PriceTicker({ latestTick }: PriceTickerProps) {
+  const { t } = useLanguage()
   const [activeKey, setActiveKey] = useState<StreamKey>('crypto')
   const [ticks, setTicks] = useState<PriceTick[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,10 +78,10 @@ export default function PriceTicker({ latestTick }: PriceTickerProps) {
   // Flash updated symbol when SSE tick arrives
   useEffect(() => {
     if (!latestTick) return
-    setTicks(prev => prev.map(t =>
-      t.symbol === latestTick.symbol
-        ? { ...t, value: latestTick.value, change_pct: latestTick.change_pct, occurred_at: latestTick.occurred_at }
-        : t
+    setTicks(prev => prev.map(tk =>
+      tk.symbol === latestTick.symbol
+        ? { ...tk, value: latestTick.value, change_pct: latestTick.change_pct, occurred_at: latestTick.occurred_at }
+        : tk
     ))
     setFlashedSymbols(prev => new Set([...prev, latestTick.symbol]))
     const timer = setTimeout(() => {
@@ -105,7 +99,7 @@ export default function PriceTicker({ latestTick }: PriceTickerProps) {
       {/* Header + tabs */}
       <div style={{ padding: '0.5rem 0.75rem 0', borderBottom: '1px solid #1a1a26' }}>
         <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#44445a', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-          Markets
+          {t.markets}
         </div>
         <div style={{ display: 'flex', gap: '0.2rem', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {STREAM_KEYS.map(key => (
@@ -124,7 +118,7 @@ export default function PriceTicker({ latestTick }: PriceTickerProps) {
                 whiteSpace: 'nowrap',
               }}
             >
-              {STREAM_KEY_LABELS[key]}
+              {t.streamKeys[key]}
             </button>
           ))}
         </div>
@@ -132,20 +126,20 @@ export default function PriceTicker({ latestTick }: PriceTickerProps) {
 
       {/* Column headers */}
       <div style={{ display: 'flex', padding: '0.22rem 0.75rem', gap: '0.5rem', borderBottom: '1px solid #18182a' }}>
-        <span style={{ flex: '0 0 72px', fontSize: '0.62rem', color: '#33334a', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Symbol</span>
+        <span style={{ flex: '0 0 72px', fontSize: '0.62rem', color: '#33334a', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{t.symbolCol}</span>
         <span style={{ flex: 1 }} />
-        <span style={{ flex: '0 0 80px', textAlign: 'right', fontSize: '0.62rem', color: '#33334a', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Price</span>
-        <span style={{ flex: '0 0 56px', textAlign: 'right', fontSize: '0.62rem', color: '#33334a', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Chg%</span>
+        <span style={{ flex: '0 0 80px', textAlign: 'right', fontSize: '0.62rem', color: '#33334a', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{t.priceCol}</span>
+        <span style={{ flex: '0 0 56px', textAlign: 'right', fontSize: '0.62rem', color: '#33334a', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{t.changeCol}</span>
       </div>
 
       {/* Rows */}
       <div style={{ maxHeight: 200, overflowY: 'auto' }}>
         {loading
-          ? <div style={{ padding: '0.75rem', fontSize: '0.72rem', color: '#33334a',minHeight:200 }}>Loading…</div>
+          ? <div style={{ padding: '0.75rem', fontSize: '0.72rem', color: '#33334a', minHeight: 200 }}>{t.loading}</div>
           : ticks.length === 0
-            ? <div style={{ padding: '0.75rem', fontSize: '0.72rem', color: '#33334a' }}>No data yet</div>
-            : ticks.map(t => (
-                <PriceRow key={t.id} tick={t} flash={flashedSymbols.has(t.symbol)} />
+            ? <div style={{ padding: '0.75rem', fontSize: '0.72rem', color: '#33334a' }}>{t.noDataYet}</div>
+            : ticks.map(tk => (
+                <PriceRow key={tk.id} tick={tk} flash={flashedSymbols.has(tk.symbol)} />
               ))
         }
       </div>

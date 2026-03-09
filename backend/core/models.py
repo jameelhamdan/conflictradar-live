@@ -106,6 +106,11 @@ class Article(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
 
+    # i18n — subdocument keyed by language code, e.g.:
+    # {"en": {"title": "...", "summary": "...", "country": "...", "city": "..."},
+    #  "ar": {"title": "...", "summary": "...", "country": "...", "city": "..."}}
+    translations = models.JSONField(default=dict, blank=True)
+
     updated_on = models.DateTimeField(auto_now=True)
     created_on = models.DateTimeField(auto_now_add=True)
     extra_data = models.JSONField(default=dict, blank=True)
@@ -158,6 +163,11 @@ class Event(models.Model):
     article_ids = models.JSONField(default=list)
     source_codes = models.JSONField(default=list)
     sub_categories = models.JSONField(default=list, blank=True)
+
+    # i18n — subdocument keyed by language code, e.g.:
+    # {"en": {"title": "...", "location_name": "..."},
+    #  "ar": {"title": "...", "location_name": "..."}}
+    translations = models.JSONField(default=dict, blank=True)
 
     updated_on = models.DateTimeField(auto_now=True)
     created_on = models.DateTimeField(auto_now_add=True)
@@ -346,3 +356,4 @@ class ArticleFeatures:
     category: str           # LLM-assigned category slug
     sub_category: str | None  # LLM-assigned sub-category slug within category
     llm_data: dict          # raw LLM response — stored in article.extra_data['llm']
+    translations: dict      # i18n subdocument — stored in article.translations

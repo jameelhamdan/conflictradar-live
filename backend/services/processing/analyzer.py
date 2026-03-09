@@ -25,8 +25,22 @@ Schema:
 {
   "category":     one of: conflict | protest | disaster | political | economic | crime | general,
   "sub_category": sub-category slug for the chosen category (see list below), or null,
-  "country":      country name as a string, or null if not determinable,
-  "city":         city or region name as a string, or null if not determinable
+  "country":      country name in English as a string, or null if not determinable,
+  "city":         city or region name in English as a string, or null if not determinable,
+  "translations": {
+    "en": {
+      "title":   the article title translated to English (keep original if already English),
+      "summary": a 2-3 sentence factual summary in English,
+      "country": country name in English, or null,
+      "city":    city or region name in English, or null
+    },
+    "ar": {
+      "title":   the article title translated to Arabic,
+      "summary": a 2-3 sentence factual summary in Arabic,
+      "country": country name in Arabic, or null,
+      "city":    city or region name in Arabic, or null
+    }
+  }
 }
 
 Category and sub-category definitions:
@@ -77,6 +91,7 @@ class ArticleAnalysis:
     latitude: float | None
     longitude: float | None
     llm_data: dict            # raw parsed LLM response for storage in extra_data
+    translations: dict        # i18n subdocument: {"en": {...}, "ar": {...}}
 
 
 @functools.lru_cache(maxsize=1)
@@ -191,6 +206,7 @@ class ArticleAnalyzer:
                 country=None, city=None,
                 latitude=None, longitude=None,
                 llm_data={},
+                translations={},
             )
 
     def _parse(self, raw: str) -> ArticleAnalysis:
@@ -204,6 +220,13 @@ class ArticleAnalyzer:
         country = data.get('country') or None
         city = data.get('city') or None
         lat, lon = _geocode(city, country)
+        translations = data.get('translations') or {}
+        # Sanitise: ensure each language entry is a dict
+        if not isinstance(translations, dict):
+            translations = {}
+        for lang_key in list(translations.keys()):
+            if not isinstance(translations[lang_key], dict):
+                del translations[lang_key]
         llm_data = {
             'category': category,
             'sub_category': sub_category,
@@ -215,4 +238,5 @@ class ArticleAnalyzer:
             country=country, city=city,
             latitude=lat, longitude=lon,
             llm_data=llm_data,
+            translations=translations,
         )
