@@ -3,7 +3,7 @@
 import { useLanguage } from "../contexts/LanguageContext";
 import { categoryColor } from "@/components/category";
 import { CATEGORY_LABEL } from "../i18n/categories";
-import { PageLayout } from "../components/layout";
+import { PageLayout, SiteLogo } from "../components/layout";
 import { Card } from "@/components/ui/card";
 
 const CONTACT_EMAIL = "contact@conflictradar.live";
@@ -19,9 +19,8 @@ function AboutContent() {
         <div className="mb-4 inline-block rounded-full border border-app-accent-red/20 bg-app-accent-red/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-app-accent-red">
           {t.openSourceRealtime}
         </div>
-        <h1 className="mb-4 text-4xl font-extrabold leading-none tracking-tight md:text-5xl lg:text-6xl">
-          <span className="text-foreground">conflictradar</span>
-          <span className="text-app-accent-red">.live</span>
+        <h1 className="mb-4">
+          <SiteLogo size="lg" />
         </h1>
         <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted-foreground">
           {t.aboutHeroTagline}

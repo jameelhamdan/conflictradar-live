@@ -5,6 +5,23 @@ import constants from "@/constants";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
+interface SiteLogoProps {
+  size?: "sm" | "lg";
+}
+
+export function SiteLogo({ size = "sm" }: SiteLogoProps) {
+  const sizeClass =
+    size === "lg"
+      ? "text-4xl font-extrabold leading-none tracking-tight md:text-5xl lg:text-6xl"
+      : "text-[0.95rem] font-bold tracking-tight";
+  return (
+    <span dir="ltr" className="inline-flex">
+      <span className={cn(sizeClass, "text-foreground")}>conflictradar</span>
+      <span className={cn(sizeClass, "text-app-accent-red")}>.live</span>
+    </span>
+  );
+}
+
 interface SiteHeaderProps {
   activePage?: string;
   children?: ReactNode;
@@ -15,10 +32,9 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
   const { lang, setLang, t } = useLanguage();
 
   return (
-    <nav className="flex h-11 shrink-0 items-center gap-3 overflow-hidden border-b border-app-border bg-app-surface px-4">
+    <nav className="ltr flex h-11 shrink-0 items-center gap-3 overflow-hidden border-b border-app-border bg-app-surface px-4">
       <a href="/" className="ltr flex shrink-0 items-center no-underline">
-        <span className="text-[0.95rem] font-bold tracking-tight text-foreground">conflictradar</span>
-        <span className="text-[0.95rem] font-bold tracking-tight text-app-accent-red">.live</span>
+        <SiteLogo />
       </a>
 
       {/* Middle slot: flex spacer on plain pages, time filters + toggle on main page */}
@@ -57,7 +73,7 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
       <button
         onClick={() => setLang(lang === "en" ? "ar" : "en")}
         title={lang === "en" ? "Switch to Arabic" : "Switch to English"}
-        className="shrink-0 cursor-pointer rounded-full border border-border bg-secondary px-[0.55rem] py-[0.18rem] text-[0.78rem] font-semibold tracking-wide text-muted-foreground transition-colors hover:bg-secondary/80"
+        className="shrink-0 cursor-pointer rounded px-[0.45rem] py-[0.2rem] text-[0.8rem] font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         {lang === "en" ? "ع" : "EN"}
       </button>
@@ -101,9 +117,7 @@ export function PageLayout({ children, activePage }: PageLayoutProps) {
   return (
     <div className="min-h-screen bg-app-bg text-app-text-primary">
       <SiteHeader activePage={activePage} />
-      <main className="mx-auto max-w-xl flex-1">
-        {children}
-      </main>
+      <main className="mx-auto max-w-xl flex-1">{children}</main>
       <SiteFooter />
     </div>
   );
