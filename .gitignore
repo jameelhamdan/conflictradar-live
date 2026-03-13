@@ -21,6 +21,7 @@ eggs/
 lib/
 lib64/
 !ui/src/lib/
+!ui/src/assets/
 parts/
 sdist/
 var/
