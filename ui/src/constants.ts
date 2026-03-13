@@ -3,4 +3,4 @@ export default {
   VERSION: __APP_VERSION__,
   BASE_URL: import.meta.env.VITE_DOMAIN || "http://localhost:8000",
   GA_ID: import.meta.env.VITE_GA_ID as string | undefined,
-}
+};
