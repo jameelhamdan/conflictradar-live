@@ -14,6 +14,7 @@ services:
       context: ./ui
       args:
         VITE_GA_ID: ${VITE_GA_ID:-}
+        VITE_DOMAIN: ${VITE_DOMAIN:-}
     command: sh -c "cp -r /app/dist/. /frontend_dist/"
     restart: "no"
     volumes:
