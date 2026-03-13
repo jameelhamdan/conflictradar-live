@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>conflictradar.live</title>
+    <meta name="description" content="UI shell for conflictradar.live" />
+    <meta name="theme-color" content="#0f0f13" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (function () {
+        try {
+          var m = document.cookie.match(/(?:^|;\s*)lang=([^;]+)/)
+          var l = m && (m[1] === 'ar' || m[1] === 'en') ? m[1] : null
+          if (!l) {
+            var n =
+              navigator.language || (navigator.languages && navigator.languages[0]) || 'en'
+            l = n.toLowerCase().startsWith('ar') ? 'ar' : 'en'
+          }
+          document.documentElement.lang = l
+          document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr'
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

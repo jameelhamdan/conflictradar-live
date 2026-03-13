@@ -1,0 +1,44 @@
+'use client'
+
+import { useRef, useEffect } from "react"
+import EventCard from "./EventCard"
+import StatusDisplay from "../StatusDisplay"
+import type { EventSummary } from "../../types"
+
+interface EventListProps {
+  events: EventSummary[]
+  selectedId: string | null
+  onSelectEvent: (id: string) => void
+}
+
+export default function EventList({ events, selectedId, onSelectEvent }: EventListProps) {
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  useEffect(() => {
+    if (selectedId && cardRefs.current[selectedId]) {
+      cardRefs.current[selectedId]!.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      })
+    }
+  }, [selectedId])
+
+  if (events.length === 0) {
+    return <StatusDisplay status="empty" message="No events match the current filters." />
+  }
+
+  return (
+    <div className="flex flex-col">
+      {events.map((ev) => (
+        <div
+          key={ev.id}
+          ref={(el) => {
+            cardRefs.current[ev.id] = el
+          }}
+        >
+          <EventCard event={ev} selected={selectedId === ev.id} onSelect={onSelectEvent} />
+        </div>
+      ))}
+    </div>
+  )
+}
