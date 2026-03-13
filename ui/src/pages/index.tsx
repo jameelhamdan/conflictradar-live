@@ -10,6 +10,7 @@ import { categoryColor, categoryShapeComponent } from "@/components/category";
 import { useLanguage } from "../contexts/LanguageContext";
 import { categoryLabel } from "../i18n/categories";
 import type { EventSummary, EventFilters } from "../types";
+import { cn } from "@/lib/utils";
 
 const MapView = lazy(() => import("../components/events/MapView"));
 const POLL_INTERVAL_MS = 60_000;
@@ -30,6 +31,12 @@ const QUICK_FILTERS = [
   { value: "24h", label: "24h", ms: 24 * 60 * 60 * 1000 },
   { value: "7d", label: "7d", ms: 7 * 24 * 60 * 60 * 1000 },
   { value: "30d", label: "30d", ms: 30 * 24 * 60 * 60 * 1000 },
+] as const;
+
+const OVERLAY_CONTROLS = [
+  { key: "notams", color: "#ff6644" },
+  { key: "earthquakes", color: "#7c6ef8" },
+  { key: "staticPoints", color: "#4fc3f7" },
 ] as const;
 
 type QuickFilter = (typeof QUICK_FILTERS)[number]["value"] | "";
@@ -58,6 +65,14 @@ export default function IndexPage() {
     occurred_at: string;
   } | null>(null);
 
+  const overlayState = { notams: showNotams, earthquakes: showEarthquakes, staticPoints: showStaticPoints };
+  const overlaySetters = {
+    notams: setShowNotams,
+    earthquakes: setShowEarthquakes,
+    staticPoints: setShowStaticPoints,
+  };
+  const overlayLabels = { notams: t.notams, earthquakes: t.earthquakes, staticPoints: t.locations };
+
   useSSE((event) => {
     if (event.type === "notam_update" || event.type === "earthquake_update") {
       setStreamRefresh((n) => n + 1);
@@ -77,10 +92,7 @@ export default function IndexPage() {
       let effectiveFilters = filters;
       if (quickFilter) {
         const offsetMs = QUICK_FILTERS.find((q) => q.value === quickFilter)!.ms;
-        effectiveFilters = {
-          ...filters,
-          start: new Date(Date.now() - offsetMs).toISOString(),
-        };
+        effectiveFilters = { ...filters, start: new Date(Date.now() - offsetMs).toISOString() };
       }
       const data = await fetchEvents(effectiveFilters);
       setEvents(data.results);
@@ -127,65 +139,23 @@ export default function IndexPage() {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        overflow: "hidden",
-        background: "#0f0f13",
-        color: "#e0e0e0",
-      }}
-    >
-      <header
-        style={{
-          flexShrink: 0,
-          background: "#13131c",
-          borderBottom: "1px solid #1e1e2a",
-        }}
-      >
+    <div className="flex h-screen flex-col overflow-hidden bg-app-bg text-app-text-primary">
+      <header className="shrink-0 border-b border-app-border bg-app-surface">
         <SiteHeader showNav={!isMobile}>
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-              style={{
-                background: "none",
-                border: "none",
-                color: sidebarOpen ? "#7c9ef8" : "#55556a",
-                fontSize: "1.2rem",
-                cursor: "pointer",
-                padding: "0.2rem 0.4rem",
-                width: "1.6rem",
-                height: "1.6rem",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "color 0.12s",
-                flexShrink: 0,
-              }}
+              className={cn(
+                "flex h-[1.6rem] w-[1.6rem] shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-[0.2rem] text-[1.2rem] transition-colors duration-[120ms]",
+                sidebarOpen ? "text-app-accent-blue" : "text-app-text-muted",
+              )}
             >
               {sidebarOpen ? "✕" : "☰"}
             </button>
           )}
-          <div
-            style={{
-              width: 1,
-              height: 18,
-              background: "#1e1e2a",
-              flexShrink: 0,
-            }}
-          />
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.2rem",
-              flex: 1,
-              overflowX: "auto",
-              scrollbarWidth: "none",
-            }}
-          >
+          <div className="h-[18px] w-px shrink-0 bg-app-border" />
+          <div className="flex flex-1 items-center gap-[0.2rem] overflow-x-auto [scrollbar-width:none]">
             {QUICK_FILTERS.map((qf) => {
               const active = quickFilter === qf.value;
               return (
@@ -195,19 +165,7 @@ export default function IndexPage() {
                     setQuickFilter(active ? "" : qf.value);
                     setFilters((f) => ({ ...f, start: "", end: "" }));
                   }}
-                  style={{
-                    fontSize: "0.75rem",
-                    fontWeight: active ? 600 : 400,
-                    padding: "0.18rem 0.52rem",
-                    borderRadius: 99,
-                    border: `1px solid ${active ? "#7c9ef844" : "transparent"}`,
-                    background: active ? "#7c9ef81a" : "transparent",
-                    color: active ? "#7c9ef8" : "#55556a",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                    transition: "color 0.12s, background 0.12s, border-color 0.12s",
-                  }}
+                  className={cn("qf-btn", active ? "qf-btn-active" : "qf-btn-inactive")}
                 >
                   {qf.label}
                 </button>
@@ -217,17 +175,7 @@ export default function IndexPage() {
               <button
                 onClick={clearQuickFilter}
                 title="Clear time filter"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#44445a",
-                  fontSize: "0.7rem",
-                  cursor: "pointer",
-                  padding: "0.1rem 0.25rem",
-                  borderRadius: 3,
-                  lineHeight: 1,
-                  flexShrink: 0,
-                }}
+                className="shrink-0 cursor-pointer rounded border-none bg-transparent px-[0.25rem] py-[0.1rem] text-[0.7rem] leading-none text-app-text-ghost"
               >
                 ✕
               </button>
@@ -235,20 +183,10 @@ export default function IndexPage() {
           </div>
         </SiteHeader>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.2rem",
-            padding: "0 0.75rem",
-            height: 34,
-            overflowX: "auto",
-            scrollbarWidth: "none",
-          }}
-        >
+        <div className="flex h-[34px] items-center gap-[0.2rem] overflow-x-auto px-3 [scrollbar-width:none]">
           {CATEGORY_TABS.map((tab) => {
             const active = filters.category === tab.value;
-            const color = tab.value ? categoryColor(tab.value) : "#7c9ef8";
+            const color = tab.value ? categoryColor(tab.value) : "var(--app-accent-blue)";
             const Shape = tab.value ? categoryShapeComponent(tab.value) : null;
             return (
               <button
@@ -259,35 +197,13 @@ export default function IndexPage() {
                     category: tab.value !== "" && f.category === tab.value ? "" : tab.value,
                   }))
                 }
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.28rem",
-                  fontSize: "0.77rem",
-                  fontWeight: active ? 600 : 400,
-                  padding: "0.18rem 0.6rem",
-                  borderRadius: 99,
-                  border: `1px solid ${active ? color + "55" : color + "22"}`,
-                  background: active ? color + "22" : "transparent",
-                  color: active ? color : color + "bb",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  transition: "color 0.12s, background 0.12s, border-color 0.12s",
-                  letterSpacing: "0.01em",
-                }}
+                className={cn("cat-tab", active ? "cat-tab-active" : "cat-tab-inactive")}
+                style={{ "--cat-color": color } as React.CSSProperties}
               >
                 {Shape ? (
                   <Shape size={10} color={active ? color : color + "bb"} />
                 ) : (
-                  <span
-                    style={{
-                      fontSize: "0.62rem",
-                      opacity: active ? 1 : 0.55,
-                    }}
-                  >
-                    ◉
-                  </span>
+                  <span className={cn("text-[0.62rem]", active ? "opacity-100" : "opacity-55")}>◉</span>
                 )}
                 {categoryLabel(lang, tab.value || "all")}
               </button>
@@ -296,24 +212,15 @@ export default function IndexPage() {
         </div>
       </header>
 
-      <main
-        style={{
-          display: "flex",
-          flex: 1,
-          overflow: "hidden",
-          position: "relative",
-        }}
-      >
+      <main className="relative flex flex-1 overflow-hidden">
         <section
-          style={{
-            flex: isMobile ? (sidebarOpen ? 0 : 1) : "1 1 60%",
-            minWidth: 0,
-            position: "relative",
-            display: isMobile && sidebarOpen ? "none" : "block",
-          }}
+          className={cn(
+            "relative min-w-0",
+            isMobile ? (sidebarOpen ? "hidden" : "block flex-1") : "block flex-[1_1_60%]",
+          )}
         >
           {mounted && (
-            <Suspense fallback={<div style={{ height: "100%", background: "#191920" }} />}>
+            <Suspense fallback={<div className="h-full bg-app-panel" />}>
               <MapView
                 events={events}
                 selectedId={selectedId}
@@ -327,88 +234,31 @@ export default function IndexPage() {
           )}
 
           {(!isMobile || mobileTab === "map") && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: isMobile ? 16 : 28,
-                left: 10,
-                zIndex: 1000,
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.25rem",
-              }}
-            >
-              {(
-                [
-                  {
-                    key: "notams",
-                    label: t.notams,
-                    color: "#ff6644",
-                    value: showNotams,
-                    set: setShowNotams,
-                  },
-                  {
-                    key: "earthquakes",
-                    label: t.earthquakes,
-                    color: "#7c6ef8",
-                    value: showEarthquakes,
-                    set: setShowEarthquakes,
-                  },
-                  {
-                    key: "staticPoints",
-                    label: t.locations,
-                    color: "#4fc3f7",
-                    value: showStaticPoints,
-                    set: setShowStaticPoints,
-                  },
-                ] as const
-              ).map(({ key, label, color, value, set }) => (
-                <button
-                  key={key}
-                  onClick={() => set((v) => !v)}
-                  style={{
-                    fontSize: "0.7rem",
-                    fontWeight: value ? 600 : 400,
-                    padding: "0.2rem 0.55rem",
-                    borderRadius: 99,
-                    border: `1px solid ${value ? color + "66" : "#2a2a3a"}`,
-                    background: value ? color + "22" : "#0d0d1488",
-                    color: value ? color : "#44445a",
-                    cursor: "pointer",
-                    backdropFilter: "blur(4px)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="absolute left-[10px] z-[1000] flex flex-col gap-1" style={{ bottom: isMobile ? 16 : 28 }}>
+              {OVERLAY_CONTROLS.map(({ key, color }) => {
+                const active = overlayState[key];
+                return (
+                  <button
+                    key={key}
+                    onClick={() => overlaySetters[key]((v) => !v)}
+                    className={cn("overlay-btn", active ? "overlay-btn-active" : "overlay-btn-inactive")}
+                    style={{ "--overlay-color": color } as React.CSSProperties}
+                  >
+                    {overlayLabels[key]}
+                  </button>
+                );
+              })}
             </div>
           )}
         </section>
 
         <section
-          style={{
-            ...(isMobile
-              ? {
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 500,
-                  display: mobileTab === "list" ? "flex" : "none",
-                  flexDirection: "column",
-                }
-              : {
-                  flex: "0 0 380px",
-                  borderLeft: "1px solid #1e1e2a",
-                }),
-            overflowY: "auto",
-            borderLeft: isMobile ? "none" : "1px solid #1e1e2a",
-
-            background: "#0d0d14",
-            display: isMobile && !sidebarOpen ? "none" : "flex",
-            flexDirection: "column",
-            minWidth: 0,
-            flex: isMobile ? (sidebarOpen ? 1 : 0) : "0 0 380px",
-          }}
+          className={cn(
+            "flex min-w-0 flex-col overflow-y-auto bg-app-panel",
+            isMobile
+              ? cn("absolute inset-0 z-[500]", !sidebarOpen && "hidden")
+              : "flex-[0_0_380px] border-l border-app-border",
+          )}
         >
           <PriceTicker latestTick={latestPriceTick} />
           <EventList events={events} selectedId={selectedId} onSelectEvent={handleSelectEvent} />
@@ -416,15 +266,7 @@ export default function IndexPage() {
       </main>
 
       {isMobile && (
-        <nav
-          style={{
-            flexShrink: 0,
-            display: "flex",
-            height: 52,
-            background: "#13131c",
-            borderTop: "1px solid #1e1e2a",
-          }}
-        >
+        <nav className="flex h-[52px] shrink-0 border-t border-app-border bg-app-surface">
           {(["map", "list"] as const).map((tab) => {
             const active = mobileTab === tab;
             return (
@@ -434,48 +276,15 @@ export default function IndexPage() {
                   setMobileTab(tab);
                   setSidebarOpen(tab === "list");
                 }}
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.15rem",
-                  background: "none",
-                  border: "none",
-                  borderTop: `2px solid ${active ? "#7c9ef8" : "transparent"}`,
-                  color: active ? "#7c9ef8" : "#44445a",
-                  fontSize: "0.7rem",
-                  fontWeight: active ? 600 : 400,
-                  cursor: "pointer",
-                  transition: "color 0.12s",
-                  WebkitTapHighlightColor: "transparent",
-                }}
+                className={cn("mobile-nav-btn", active ? "mobile-nav-btn-active" : "mobile-nav-btn-inactive")}
               >
-                <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>{tab === "map" ? "⬡" : "☰"}</span>
+                <span className="text-[1.05rem] leading-none">{tab === "map" ? "⬡" : "☰"}</span>
                 {tab === "map" ? t.mapTab : t.listTab}
               </button>
             );
           })}
-          <a
-            href="/newsletter"
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.15rem",
-              background: "none",
-              border: "none",
-              borderTop: "2px solid transparent",
-              color: "#44445a",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              textDecoration: "none",
-            }}
-          >
-            <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>✉</span>
+          <a href="/newsletter" className="mobile-nav-link">
+            <span className="text-[1.05rem] leading-none">✉</span>
             {t.briefingsTab}
           </a>
         </nav>

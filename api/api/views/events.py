@@ -87,7 +87,8 @@ class EventListView(APIView):
                 )
 
         limit = _parse_int(request.query_params.get('limit'), 100, 500)
-        data = {'results': EventSerializer(qs[:limit], many=True).data}
+        source_map = {s.code: s.name for s in core_models.Source.objects.only('code', 'name')}
+        data = {'results': EventSerializer(qs[:limit], many=True, context={'source_map': source_map}).data}
         data['count'] = len(data['results'])
         cache.set(cache_key, data, _CACHE_TTL)
         return Response(data)
@@ -115,7 +116,8 @@ class EventDetailView(APIView):
                 pass
 
         articles = core_models.Article.objects.filter(id__in=article_uuids)
-        data = EventSerializer(event).data
+        source_map = {s.code: s.name for s in core_models.Source.objects.only('code', 'name')}
+        data = EventSerializer(event, context={'source_map': source_map}).data
         data['articles'] = ArticleSerializer(articles, many=True).data
         cache.set(cache_key, data, _CACHE_TTL)
         return Response(data)

@@ -19,6 +19,8 @@ export interface EventSummary {
   location_name: string
   location_name_ar: string
   article_count: number
+  source_codes: string[]
+  source_names: string[]
   started_at: string
 }
 

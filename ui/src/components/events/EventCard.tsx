@@ -7,6 +7,8 @@ import { timeAgo, CategoryBadge, EventMeta, useLocalizedField } from "./EventUI"
 import { useLanguage } from "../../contexts/LanguageContext"
 import { subCategoryLabel } from "../../i18n/categories"
 import type { EventSummary, Article } from "../../types"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 
 interface EventCardProps {
   event: EventSummary
@@ -14,17 +16,16 @@ interface EventCardProps {
   onSelect: (id: string) => void
 }
 
-export default function EventCard({
-  event,
-  selected,
-  onSelect,
-}: EventCardProps) {
+export default function EventCard({ event, selected, onSelect }: EventCardProps) {
   const { lang, t } = useLanguage()
   const pick = useLocalizedField()
   const [articles, setArticles] = useState<Article[] | null>(null)
   const [loadingArticles, setLoadingArticles] = useState(false)
 
   const color = categoryColor(event.category)
+  const sourceNameMap = Object.fromEntries(
+    (event.source_codes ?? []).map((code, i) => [code, event.source_names?.[i] ?? code])
+  )
 
   async function toggleArticles(e: React.MouseEvent) {
     e.stopPropagation()
@@ -44,124 +45,58 @@ export default function EventCard({
   return (
     <div
       onClick={() => onSelect(event.id)}
-      style={{
-        padding: "0.75rem 1rem",
-        borderBottom: "1px solid #2a2a3a",
-        borderLeft: `3px solid ${color}`,
-        background: selected ? "#1e1e2e" : "#16161f",
-        cursor: "pointer",
-        transition: "background 0.15s",
-      }}
+      className={cn("event-card", selected ? "bg-app-card-selected" : "bg-app-card")}
+      style={{ "--cat-color": color } as React.CSSProperties}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "0.35rem",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.35rem",
-            flexWrap: "wrap",
-          }}
-        >
+      <div className="mb-[0.35rem] flex items-center justify-between">
+        <div className="flex flex-wrap items-center gap-[0.35rem]">
           <CategoryBadge category={event.category} />
           {event.sub_categories?.map((sub) => (
-            <span
-              key={sub}
-              style={{
-                fontSize: "0.65rem",
-                padding: "0.1rem 0.4rem",
-                borderRadius: 99,
-                background: "#2a2a3a",
-                color: "#aaa",
-                fontWeight: 500,
-              }}
-            >
+            <span key={sub} className="sub-cat-tag">
               {subCategoryLabel(lang, sub)}
             </span>
           ))}
         </div>
-        <span style={{ fontSize: "0.75rem", color: "#666" }}>
+        <span className="text-[0.75rem] text-app-text-ghost">
           {timeAgo(event.started_at, lang)}
         </span>
       </div>
 
-      <div
-        style={{
-          fontSize: "0.9rem",
-          fontWeight: 500,
-          lineHeight: 1.35,
-          marginBottom: "0.4rem",
-          color: "#d8d8e8",
-        }}
-      >
+      <div className="mb-[0.4rem] text-[0.9rem] font-medium leading-[1.35] text-app-text-body">
         {pick(event as unknown as Record<string, unknown>, "title")}
       </div>
 
-      <div style={{ marginBottom: "0.4rem" }}>
+      <div className="mb-[0.4rem]">
         <EventMeta event={event} />
       </div>
 
-      <button
+      <Button
         onClick={toggleArticles}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#5577cc",
-          fontSize: "0.75rem",
-          cursor: "pointer",
-          padding: 0,
-        }}
+        variant="link"
+        className="h-auto p-0 text-[0.75rem] text-app-accent-blue"
       >
-        {loadingArticles
-          ? t.loading
-          : articles
-            ? t.hideArticles
-            : t.showArticles}
-      </button>
+        {loadingArticles ? t.loading : articles ? t.hideArticles : t.showArticles}
+      </Button>
 
       {articles && (
-        <ul
-          style={{
-            listStyle: "none",
-            marginTop: "0.5rem",
-            paddingLeft: "0.5rem",
-            borderLeft: "2px solid #2a2a3a",
-          }}
-        >
+        <ul className="mt-2 list-none border-l-2 border-app-border-subtle pl-2">
           {articles.map((a) => (
-            <li
-              key={a.id}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                marginBottom: "0.5rem",
-              }}
-            >
+            <li key={a.id} className="mb-2 flex flex-col">
               <a
                 href={a.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{
-                  color: "#7c9ef8",
-                  textDecoration: "none",
-                  fontSize: "0.82rem",
-                }}
+                className="text-[0.82rem] text-app-accent-blue no-underline"
               >
                 {pick(a as unknown as Record<string, unknown>, "title")}
               </a>
-              <span style={{ color: "#666", fontSize: "0.73rem" }}>
-                {a.source_code} · {new Date(a.published_on).toLocaleString()}
+              <span className="text-[0.73rem] text-app-text-ghost">
+                {sourceNameMap[a.source_code] ?? a.source_code} · {new Date(a.published_on).toLocaleString()}
               </span>
             </li>
           ))}
           {articles.length === 0 && (
-            <li style={{ color: "#666", fontSize: "0.8rem" }}>{t.noEvents}</li>
+            <li className="text-[0.8rem] text-app-text-ghost">{t.noEvents}</li>
           )}
         </ul>
       )}

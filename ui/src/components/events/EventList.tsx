@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react"
 import EventCard from "./EventCard"
+import StatusDisplay from "../StatusDisplay"
 import type { EventSummary } from "../../types"
 
 interface EventListProps {
@@ -10,11 +11,7 @@ interface EventListProps {
   onSelectEvent: (id: string) => void
 }
 
-export default function EventList({
-  events,
-  selectedId,
-  onSelectEvent,
-}: EventListProps) {
+export default function EventList({ events, selectedId, onSelectEvent }: EventListProps) {
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
@@ -27,22 +24,11 @@ export default function EventList({
   }, [selectedId])
 
   if (events.length === 0) {
-    return (
-      <div
-        style={{
-          padding: "2rem 1rem",
-          color: "#555",
-          fontSize: "0.85rem",
-          textAlign: "center",
-        }}
-      >
-        No events match the current filters.
-      </div>
-    )
+    return <StatusDisplay status="empty" message="No events match the current filters." />
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div className="flex flex-col">
       {events.map((ev) => (
         <div
           key={ev.id}
@@ -50,14 +36,9 @@ export default function EventList({
             cardRefs.current[ev.id] = el
           }}
         >
-          <EventCard
-            event={ev}
-            selected={selectedId === ev.id}
-            onSelect={onSelectEvent}
-          />
+          <EventCard event={ev} selected={selectedId === ev.id} onSelect={onSelectEvent} />
         </div>
       ))}
     </div>
   )
 }
-

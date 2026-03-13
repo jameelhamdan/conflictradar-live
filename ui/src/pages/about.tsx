@@ -3,7 +3,8 @@
 import { useLanguage } from "../contexts/LanguageContext";
 import { categoryColor } from "@/components/category";
 import { CATEGORY_LABEL } from "../i18n/categories";
-import { PageLayout  } from "../components/layout";
+import { PageLayout } from "../components/layout";
+import { Card } from "@/components/ui/card";
 
 const CONTACT_EMAIL = "contact@conflictradar.live";
 
@@ -15,29 +16,29 @@ function AboutContent() {
   return (
     <div className="px-8 py-12 md:py-16 lg:py-20">
       <header className="mb-12 text-center">
-        <div className="inline-block text-xs font-semibold tracking-wider uppercase text-[#e05252] bg-[#e05252]/10 border border-[#e05252]/20 rounded-full px-3 py-1 mb-4">
+        <div className="mb-4 inline-block rounded-full border border-app-accent-red/20 bg-app-accent-red/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-app-accent-red">
           {t.openSourceRealtime}
         </div>
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-none mb-4">
+        <h1 className="mb-4 text-4xl font-extrabold leading-none tracking-tight md:text-5xl lg:text-6xl">
           <span className="text-foreground">conflictradar</span>
-          <span className="text-[#e05252]">.live</span>
+          <span className="text-app-accent-red">.live</span>
         </h1>
-        <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted-foreground">
           {t.aboutHeroTagline}
         </p>
       </header>
 
       <section className="mb-10 border-t border-border pt-8">
-        <h2 className="text-lg font-bold text-foreground/90 mb-4 tracking-tight">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-foreground/90">
           {t.aboutWhatWeDoTitle}
         </h2>
-        <p className="text-muted-foreground leading-relaxed text-sm md:text-base">
+        <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
           {t.aboutWhatWeDo}
         </p>
       </section>
 
       <section className="mb-10 border-t border-border pt-8">
-        <h2 className="text-lg font-bold text-foreground/90 mb-4 tracking-tight">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-foreground/90">
           {t.aboutLegendTitle}
         </h2>
         <div className="flex flex-col gap-2">
@@ -46,17 +47,14 @@ function AboutContent() {
             const label = CATEGORY_LABEL[lang][key];
             const desc = t.categoryDescs[key];
             return (
-              <div key={key} className="flex items-center gap-3">
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: color }}
-                />
-                <span className="font-semibold text-sm" style={{ color }}>
-                  {label}
-                </span>
-                <span className="text-muted-foreground/70 text-xs md:text-sm">
-                  {desc}
-                </span>
+              <div
+                key={key}
+                className="flex items-center gap-3"
+                style={{ "--cat-color": color } as React.CSSProperties}
+              >
+                <span className="cat-legend-dot inline-block h-2.5 w-2.5 shrink-0 rounded-full" />
+                <span className="cat-legend-label text-sm font-semibold">{label}</span>
+                <span className="text-xs text-muted-foreground/70 md:text-sm">{desc}</span>
               </div>
             );
           })}
@@ -64,38 +62,38 @@ function AboutContent() {
       </section>
 
       <section className="border-t border-border pt-8">
-        <h2 className="text-lg font-bold text-foreground/90 mb-5 tracking-tight">
+        <h2 className="mb-5 text-lg font-bold tracking-tight text-foreground/90">
           {t.aboutContactTitle}
         </h2>
-        <div className="flex flex-col gap-4 mb-6">
+        <div className="mb-6 flex flex-col gap-4">
           {[
             { icon: "✉", labelKey: "contactLabelGeneral" as const, note: null },
             { icon: "🔎", labelKey: "contactLabelData" as const, note: t.contactNoteData },
             { icon: "📰", labelKey: "contactLabelPress" as const, note: t.contactNotePress },
           ].map(({ icon, labelKey, note }) => (
-            <div
+            <Card
               key={labelKey}
-              className="bg-card border border-border rounded-lg p-6 hover:border-border/80 transition-colors"
+              className="rounded-lg border-app-border bg-app-card p-6 ring-0 transition-colors hover:border-app-border-subtle"
             >
-              <div className="text-2xl mb-2 leading-none">{icon}</div>
-              <div className="text-xs font-semibold tracking-wider uppercase text-muted-foreground/70 mb-1">
+              <div className="mb-2 text-2xl leading-none">{icon}</div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
                 {t[labelKey]}
               </div>
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
-                className="inline-block text-primary text-sm md:text-base font-semibold no-underline hover:underline mb-1"
+                className="mb-1 inline-block text-sm font-semibold text-primary no-underline hover:underline md:text-base"
               >
                 {CONTACT_EMAIL}
               </a>
               {note && (
-                <p className="text-muted-foreground/70 text-xs md:text-sm leading-relaxed mt-1">
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground/70 md:text-sm">
                   {note}
                 </p>
               )}
-            </div>
+            </Card>
           ))}
         </div>
-        <p className="text-muted-foreground/60 text-sm leading-relaxed text-center">
+        <p className="text-center text-sm leading-relaxed text-muted-foreground/60">
           {t.aboutContactFooter}
         </p>
       </section>

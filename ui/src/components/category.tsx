@@ -112,8 +112,6 @@ export const CATEGORY_COLOR: Record<Category, string> = {
   general: "#888888",
 }
 
-export const CATEGORY_ICON = CATEGORY_SHAPE
-
 export function categoryColor(cat: string): string {
   return (
     (CATEGORY_COLOR as Record<string, string>)[cat] ?? CATEGORY_COLOR.general

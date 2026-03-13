@@ -1,55 +1,27 @@
 import ReactMarkdown from "react-markdown";
 
-
-  const markdownComponents = {
-    h2: ({ children }) => (
-      <h2
-        style={{
-          fontSize: "1.05rem",
-          fontWeight: 700,
-          color: "#c8c8d8",
-          marginBottom: "0.9rem",
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {children}
-      </h2>
-    ),
-    p: ({ children }) => (
-      <p
-        style={{
-          color: "#888899",
-          lineHeight: 1.75,
-          fontSize: "0.92rem",
-          marginBottom: "0.75rem",
-        }}
-      >
-        {children}
-      </p>
-    ),
-    ul: ({ children }) => (
-      <ul
-        style={{
-          color: "#888899",
-          lineHeight: 1.75,
-          fontSize: "0.92rem",
-          paddingLeft: "1.25rem",
-          marginBottom: "0.75rem",
-        }}
-      >
-        {children}
-      </ul>
-    ),
-    a: ({ href, children }) => (
-      <a href={href} style={{ color: "#7c9ef8" }}>
-        {children}
-      </a>
-    ),
-    strong: ({ children }) => (
-      <strong style={{ color: "#c8c8d8" }}>{children}</strong>
-    ),
-    span: ({ style, children }) => <span style={style}>{children}</span>,
-  }
+const markdownComponents = {
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="md-h2">{children}</h2>
+  ),
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="md-p">{children}</p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="md-ul">{children}</ul>
+  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a href={href} className="md-a">
+      {children}
+    </a>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="md-strong">{children}</strong>
+  ),
+  span: ({ style, children }: { style?: React.CSSProperties; children?: React.ReactNode }) => (
+    <span style={style}>{children}</span>
+  ),
+}
 
 interface MarkdownProps {
   content: string
@@ -58,12 +30,9 @@ interface MarkdownProps {
 function Markdown({ content }: MarkdownProps) {
   return (
     <div className="article-body">
-      <ReactMarkdown components={markdownComponents}>
-        {content}
-      </ReactMarkdown>
+      <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
     </div>
   )
 }
-
 
 export default Markdown;

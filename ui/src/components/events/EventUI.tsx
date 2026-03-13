@@ -2,6 +2,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import type { EventSummary } from "../../types";
 import { CATEGORY_LABEL } from "../../i18n/categories";
 import { CATEGORY_COLOR, categoryIcon, intensityColor } from "@/components/category";
+import { cn } from "@/lib/utils";
 
 export function timeAgo(isoStr: string, lang: "en" | "ar"): string {
   const diff = Date.now() - new Date(isoStr).getTime();
@@ -33,30 +34,11 @@ export function CategoryBadge({ category, compact }: { category: string; compact
 
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: compact ? "0.12rem 0.45rem" : "0.14rem 0.5rem",
-        borderRadius: 999,
-        border: `1px solid ${color}55`,
-        background: `${color}20`,
-      }}
+      className={cn("cat-badge", compact ? "cat-badge-compact" : "cat-badge-normal")}
+      style={{ "--cat-color": color } as React.CSSProperties}
     >
-      <Icon size={compact ? 10 : 12} color={color} />
-      {!compact && (
-        <span
-          style={{
-            fontSize: "0.7rem",
-            fontWeight: 600,
-            letterSpacing: "0.03em",
-            textTransform: "uppercase",
-            color,
-          }}
-        >
-          {label}
-        </span>
-      )}
+      <Icon size={compact ? 9 : 12} color={color} />
+      <span className="cat-badge-label">{label}</span>
     </span>
   );
 }
@@ -68,7 +50,7 @@ interface EventMetaProps {
 }
 
 export function EventMeta({ event, compact, showLocation = true }: EventMetaProps) {
-  const { lang, t } = useLanguage();
+  const { t } = useLanguage();
   const pick = useLocalizedField();
 
   const loc = pick(event as unknown as Record<string, unknown>, "location_name");
@@ -77,43 +59,27 @@ export function EventMeta({ event, compact, showLocation = true }: EventMetaProp
 
   const metaItems: string[] = [];
   if (showLocation && loc) metaItems.push(loc);
-  metaItems.push(t.articleCount(event.article_count));
+  metaItems.push(t.articleCount(event.article_count, event.source_names));
 
   return (
     <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: compact ? 6 : 8,
-        fontSize: compact ? "0.68rem" : "0.75rem",
-        color: "#666",
-        alignItems: "center",
-      }}
+      className={cn(
+        "flex flex-wrap items-center text-app-text-ghost",
+        compact ? "gap-[6px] text-[0.68rem]" : "gap-2 text-[0.75rem]",
+      )}
     >
       {hasIntensity && (
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
+        <span className="inline-flex items-center gap-1">
           <span
-            style={{
-              width: compact ? 30 : 40,
-              height: 4,
-              borderRadius: 999,
-              background: "#222233",
-              overflow: "hidden",
-            }}
+            className={cn("intensity-bar", compact ? "w-[30px]" : "w-10")}
+            style={{ height: 4 }}
           >
             <span
+              className="intensity-bar-fill"
               style={{
-                display: "block",
                 width: `${Math.round(intensity! * 100)}%`,
-                height: "100%",
-                background: intensityColor(intensity!),
-              }}
+                "--intensity-color": intensityColor(intensity!),
+              } as React.CSSProperties}
             />
           </span>
         </span>

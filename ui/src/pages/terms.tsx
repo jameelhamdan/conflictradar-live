@@ -11,8 +11,8 @@ export default function TermsPage() {
   return (
     <PageLayout activePage="terms">
       <header className="mx-8 my-12 md:my-16 lg:my-20">
-        <h1 className="mb-2 text-[1.9rem] font-extrabold tracking-tight text-foreground">{t.termsPageTitle}</h1>
-        <p className="text-[0.82rem] text-muted-foreground/70">
+        <h1 className="mb-2 text-[1.9rem] font-extrabold tracking-tight text-app-text-heading">{t.termsPageTitle}</h1>
+        <p className="text-[0.82rem] text-app-text-secondary">
           {t.lastUpdated} {LAST_UPDATED}
         </p>
       </header>

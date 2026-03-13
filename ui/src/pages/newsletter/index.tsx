@@ -11,6 +11,14 @@ export default function NewsletterPage() {
   const { t } = useLanguage()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [latestData, setLatestData] = useState<NewsletterDetail | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    function check() { setIsMobile(window.innerWidth < 768) }
+    check()
+    window.addEventListener("resize", check)
+    return () => window.removeEventListener("resize", check)
+  }, [])
 
   useEffect(() => {
     fetchLatestNewsletter()
@@ -18,21 +26,15 @@ export default function NewsletterPage() {
         setLatestData(data)
         setSelectedDate(data.date)
       })
-      .catch(() => {
-        /* no newsletters yet */
-      })
+      .catch(() => { /* no newsletters yet */ })
   }, [])
 
+  // On mobile: show list pane or detail pane, never both
+  const showList = !isMobile || !selectedDate
+  const showDetail = !isMobile || !!selectedDate
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0f0f13",
-        color: "#e0e0e0",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className="flex min-h-screen flex-col bg-app-bg text-app-text-primary">
       <title>Daily Briefing — conflictradar.live</title>
       <meta
         name="description"
@@ -42,82 +44,46 @@ export default function NewsletterPage() {
 
       <SiteHeader activePage="newsletter" />
 
-      {/* Main layout */}
-      <main
-        style={{
-          flex: 1,
-          display: "flex",
-          minHeight: 0,
-          borderTop: "1px solid #1a1a26",
-        }}
-      >
-        {/* Left column: list */}
-        <section
-          style={{
-            width: 320,
-            flexShrink: 0,
-            borderRight: "1px solid #1e1e2a",
-            background: "#0d0d14",
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-          }}
-        >
-          <div
-            style={{
-              padding: "0.75rem 1rem",
-              borderBottom: "1px solid #1e1e2a",
-              fontSize: "0.78rem",
-              fontWeight: 600,
-              color: "#888899",
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-            }}
-          >
-            {t.pastBriefings}
-          </div>
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            <NewsletterList
-              onSelect={(date) => {
-                setSelectedDate(date)
-                setLatestData(null)
-              }}
-            />
-          </div>
-        </section>
-
-        {/* Right column: reader */}
-        <section
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: "#0d0d14",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <div style={{ flex: 1, minHeight: 0 }}>
-            {selectedDate ? (
-              <NewsletterView
-                date={selectedDate}
-                initialData={latestData ?? undefined}
-              />
-            ) : (
-              <div
-                style={{
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#33334a",
-                  fontSize: "0.9rem",
+      <main className="flex flex-1 min-h-0 border-t border-app-border-mid">
+        {/* List pane */}
+        {showList && (
+          <section className={`flex flex-col border-r border-app-border bg-app-panel min-h-0 ${isMobile ? "w-full" : "w-[320px] shrink-0"}`}>
+            <div className="shrink-0 border-b border-app-border px-4 py-3 text-[0.78rem] font-semibold uppercase tracking-[0.04em] text-app-text-secondary">
+              {t.pastBriefings}
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <NewsletterList
+                onSelect={(date) => {
+                  setSelectedDate(date)
+                  setLatestData(null)
                 }}
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Detail pane */}
+        {showDetail && (
+          <section className="flex flex-1 min-w-0 flex-col bg-app-panel">
+            {isMobile && selectedDate && (
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="shrink-0 border-b border-app-border px-4 py-3 text-left text-[0.8rem] text-app-text-muted"
               >
-                {t.selectBriefing}
-              </div>
+                ← {t.pastBriefings}
+              </button>
             )}
-          </div>
-        </section>
+            <div className="flex-1 min-h-0">
+              {selectedDate ? (
+                <NewsletterView date={selectedDate} initialData={latestData ?? undefined} />
+              ) : (
+                <div className="flex h-full items-center justify-center text-[0.9rem] text-app-text-dim">
+                  {t.selectBriefing}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   )

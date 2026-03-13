@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.13-slim
 
 COPY ./requirements.txt /requirements.txt
 
@@ -6,6 +6,8 @@ RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends build-essential pkg-config curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Store HF model cache inside /py so it's readable by all users
+ENV HF_HOME=/py/huggingface
 ENV UV_INDEX_STRATEGY=unsafe-best-match
 
 RUN pip install --no-cache-dir uv \

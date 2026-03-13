@@ -3,9 +3,7 @@
 import { useState, useEffect } from "react"
 
 export default function ConfirmPage() {
-  const [status, setStatus] = useState<"loading" | "success" | "error">(
-    "loading"
-  )
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
   const [message, setMessage] = useState("")
 
   useEffect(() => {
@@ -23,9 +21,7 @@ export default function ConfirmPage() {
           setMessage(data.detail ?? "Subscription confirmed!")
         } else {
           setStatus("error")
-          setMessage(
-            data.detail ?? "This link is invalid or has already been used."
-          )
+          setMessage(data.detail ?? "This link is invalid or has already been used.")
         }
       })
       .catch(() => {
@@ -35,145 +31,41 @@ export default function ConfirmPage() {
   }, [])
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0f0f13",
-        color: "#e0e0e0",
-      }}
-    >
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 2rem",
-          height: 44,
-          background: "#13131c",
-          borderBottom: "1px solid #222230",
-        }}
-      >
-        <a
-          href="/"
-          style={{
-            color: "#55556a",
-            fontSize: "0.82rem",
-            fontWeight: 500,
-            textDecoration: "none",
-          }}
-        >
+    <div className="min-h-screen bg-app-bg text-app-text-primary">
+      <nav className="simple-page-nav">
+        <a href="/" className="text-[0.82rem] font-medium text-app-text-muted no-underline">
           ← Live map
         </a>
       </nav>
 
-      <div
-        style={{
-          maxWidth: 480,
-          margin: "0 auto",
-          padding: "5rem 2rem",
-          textAlign: "center",
-        }}
-      >
+      <div className="simple-page-content">
         {status === "loading" && (
-          <p style={{ color: "#55556a", fontSize: "0.95rem" }}>
-            Confirming your subscription…
-          </p>
+          <p className="text-[0.95rem] text-app-text-muted">Confirming your subscription…</p>
         )}
         {status === "success" && (
           <>
-            <div
-              style={{
-                fontSize: "2.5rem",
-                marginBottom: "1.25rem",
-                lineHeight: 1,
-              }}
-            >
-              ✓
-            </div>
-            <h1
-              style={{
-                fontSize: "1.4rem",
-                fontWeight: 700,
-                color: "#e8e8f0",
-                marginBottom: "0.75rem",
-                letterSpacing: "-0.01em",
-              }}
-            >
+            <div className="mb-5 text-[2.5rem] leading-none">✓</div>
+            <h1 className="mb-3 text-[1.4rem] font-bold tracking-[-0.01em] text-app-text-heading">
               You're subscribed
             </h1>
-            <p
-              style={{
-                color: "#888899",
-                fontSize: "0.92rem",
-                lineHeight: 1.65,
-                marginBottom: "2rem",
-              }}
-            >
+            <p className="mb-8 text-[0.92rem] leading-[1.65] text-app-text-secondary">
               {message}
             </p>
-            <a
-              href="/"
-              style={{
-                display: "inline-block",
-                background: "#7c9ef822",
-                border: "1px solid #7c9ef844",
-                color: "#7c9ef8",
-                borderRadius: 6,
-                padding: "0.5rem 1.25rem",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-              }}
-            >
+            <a href="/" className="simple-page-link-primary">
               Go to live map
             </a>
           </>
         )}
         {status === "error" && (
           <>
-            <div
-              style={{
-                fontSize: "2rem",
-                marginBottom: "1.25rem",
-                lineHeight: 1,
-                color: "#e05252",
-              }}
-            >
-              ✕
-            </div>
-            <h1
-              style={{
-                fontSize: "1.4rem",
-                fontWeight: 700,
-                color: "#e8e8f0",
-                marginBottom: "0.75rem",
-                letterSpacing: "-0.01em",
-              }}
-            >
+            <div className="mb-5 text-[2rem] leading-none text-app-accent-red">✕</div>
+            <h1 className="mb-3 text-[1.4rem] font-bold tracking-[-0.01em] text-app-text-heading">
               Confirmation failed
             </h1>
-            <p
-              style={{
-                color: "#888899",
-                fontSize: "0.92rem",
-                lineHeight: 1.65,
-                marginBottom: "2rem",
-              }}
-            >
+            <p className="mb-8 text-[0.92rem] leading-[1.65] text-app-text-secondary">
               {message}
             </p>
-            <a
-              href="/"
-              style={{
-                display: "inline-block",
-                background: "#16161f",
-                border: "1px solid #2a2a3a",
-                color: "#888899",
-                borderRadius: 6,
-                padding: "0.5rem 1.25rem",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-              }}
-            >
+            <a href="/" className="simple-page-link-default">
               Go to live map
             </a>
           </>

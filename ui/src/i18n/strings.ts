@@ -23,7 +23,7 @@ export interface UIStrings {
   hoursAgo: (n: number) => string
   daysAgo: (n: number) => string
   justNow: string
-  articleCount: (n: number) => string
+  articleCount: (n: number, sources?: string[]) => string
   eventCount: (n: number) => string
   subscribeTitle: string
   subscribeTagline: string
@@ -95,7 +95,14 @@ export const UI: Record<Language, UIStrings> = {
     hoursAgo: (n) => `${n}h ago`,
     daysAgo: (n) => `${n}d ago`,
     justNow: "just now",
-    articleCount: (n) => `${n} article${n !== 1 ? "s" : ""}`,
+    articleCount: (n, sources) => {
+      if (sources && sources.length > 0) {
+        const first = sources[0]
+        const rest = n - 1
+        return rest > 0 ? `${first} and ${rest} more` : first
+      }
+      return `${n} article${n !== 1 ? "s" : ""}`
+    },
     eventCount: (n) => `${n} event${n !== 1 ? "s" : ""}`,
     subscribeTitle: "Daily Briefings",
     subscribeTagline: "Get the day's top conflict intelligence in your inbox.",
@@ -179,7 +186,14 @@ export const UI: Record<Language, UIStrings> = {
     hoursAgo: (n) => `منذ ${n} س`,
     daysAgo: (n) => `منذ ${n} ي`,
     justNow: "الآن",
-    articleCount: (n) => `${n} مقال${n !== 1 ? "ات" : ""}`,
+    articleCount: (n, sources) => {
+      if (sources && sources.length > 0) {
+        const first = sources[0]
+        const rest = n - 1
+        return rest > 0 ? `${first} و${rest} آخرين` : first
+      }
+      return `${n} مقال${n !== 1 ? "ات" : ""}`
+    },
     eventCount: (n) => `${n} حدث${n !== 1 ? " ًا" : ""}`,
     subscribeTitle: "النشرات اليومية",
     subscribeTagline:

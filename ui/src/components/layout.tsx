@@ -15,10 +15,10 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
   const { lang, setLang, t } = useLanguage();
 
   return (
-    <nav className="flex h-11 flex-shrink-0 items-center gap-3 overflow-hidden border-b border-border bg-card px-4">
-      <a href="/" className="ltr flex flex-shrink-0 items-center no-underline">
+    <nav className="flex h-11 shrink-0 items-center gap-3 overflow-hidden border-b border-app-border bg-app-surface px-4">
+      <a href="/" className="ltr flex shrink-0 items-center no-underline">
         <span className="text-[0.95rem] font-bold tracking-tight text-foreground">conflictradar</span>
-        <span className="text-[0.95rem] font-bold tracking-tight text-[#e05252]">.live</span>
+        <span className="text-[0.95rem] font-bold tracking-tight text-app-accent-red">.live</span>
       </a>
 
       {/* Middle slot: flex spacer on plain pages, time filters + toggle on main page */}
@@ -31,7 +31,7 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
             to="/newsletter"
             className={({ isActive }) =>
               cn(
-                "flex-shrink-0 rounded px-[0.45rem] py-[0.2rem] text-[0.8rem] font-medium no-underline transition-colors",
+                "shrink-0 rounded px-[0.45rem] py-[0.2rem] text-[0.8rem] font-medium no-underline transition-colors",
                 isActive || activePage === "newsletter"
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -44,7 +44,7 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
             to="/about"
             className={({ isActive }) =>
               cn(
-                "flex-shrink-0 rounded px-[0.45rem] py-[0.2rem] text-[0.8rem] font-medium no-underline transition-colors",
+                "shrink-0 rounded px-[0.45rem] py-[0.2rem] text-[0.8rem] font-medium no-underline transition-colors",
                 isActive || activePage === "about" ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )
             }
@@ -57,12 +57,12 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
       <button
         onClick={() => setLang(lang === "en" ? "ar" : "en")}
         title={lang === "en" ? "Switch to Arabic" : "Switch to English"}
-        className="flex-shrink-0 cursor-pointer rounded-full border border-border bg-secondary px-[0.55rem] py-[0.18rem] text-[0.78rem] font-semibold tracking-wide text-muted-foreground transition-colors hover:bg-secondary/80"
+        className="shrink-0 cursor-pointer rounded-full border border-border bg-secondary px-[0.55rem] py-[0.18rem] text-[0.78rem] font-semibold tracking-wide text-muted-foreground transition-colors hover:bg-secondary/80"
       >
         {lang === "en" ? "ع" : "EN"}
       </button>
 
-      <span className="flex-shrink-0 font-mono text-[0.7rem] text-muted-foreground/50">v{constants.VERSION}</span>
+      <span className="shrink-0 font-mono text-[0.7rem] text-muted-foreground/50">v{constants.VERSION}</span>
     </nav>
   );
 }
@@ -70,22 +70,13 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
 export function SiteFooter() {
   const { t } = useLanguage();
   const links = [
-    {
-      href: "/terms",
-      label: t.termsLink,
-    },
-    {
-      href: "/privacy",
-      label: t.privacyLink,
-    },
-    {
-      href: "/about",
-      label: t.about,
-    },
+    { href: "/terms", label: t.termsLink },
+    { href: "/privacy", label: t.privacyLink },
+    { href: "/about", label: t.about },
   ];
 
   return (
-    <footer className="flex flex-wrap gap-5 border-t border-[#1a1a26] pt-5 pr-8 pb-5 pl-8 text-[0.78rem] text-[#44445a] no-underline">
+    <footer className="flex flex-wrap gap-5 border-t border-app-border-mid px-8 py-5 text-[0.78rem] text-app-text-ghost no-underline">
       {links.map(({ href, label }) => (
         <NavLink
           key={href}
@@ -108,9 +99,9 @@ interface PageLayoutProps {
 
 export function PageLayout({ children, activePage }: PageLayoutProps) {
   return (
-    <div className="text-text-primary min-h-screen bg-background">
+    <div className="min-h-screen bg-app-bg text-app-text-primary">
       <SiteHeader activePage={activePage} />
-      <main className="mx-auto max-w-xl" style={{ flex: 1 }}>
+      <main className="mx-auto max-w-xl flex-1">
         {children}
       </main>
       <SiteFooter />

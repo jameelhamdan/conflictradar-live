@@ -19,6 +19,7 @@ import EarthquakeLayer from "../layers/EarthquakeLayer"
 import { fetchStaticPoints } from "../../api/streams"
 import { useLanguage } from "../../contexts/LanguageContext"
 import type { EventSummary, StaticPoint, StaticPointType } from "../../types"
+import { cn } from "@/lib/utils"
 
 const POINT_TYPE_COLOR: Record<StaticPointType, string> = {
   exchange: "#4fc3f7",
@@ -69,64 +70,34 @@ function StaticPointCard({ point }: { point: StaticPoint }) {
   const m = point.metadata
   return (
     <div
-      style={{
-        borderLeft: `3px solid ${color}`,
-        background: "#16161f",
-        padding: "0.65rem 0.8rem",
-      }}
+      className="bg-app-card px-[0.8rem] py-[0.65rem]"
+      style={{ borderLeft: `3px solid ${color}` }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "0.32rem",
-        }}
-      >
+      <div className="mb-[0.32rem] flex items-center justify-between">
         <span
+          className="rounded-[3px] px-[6px] py-[1px] text-[0.65rem] font-semibold"
           style={{
-            fontSize: "0.65rem",
-            padding: "1px 6px",
-            borderRadius: 3,
             background: color + "22",
             color,
             border: `1px solid ${color}55`,
-            fontWeight: 600,
           }}
         >
           {symbol} {label}
         </span>
-        <span style={{ fontSize: "0.68rem", color: "#666" }}>
+        <span className="text-[0.68rem] text-app-text-muted">
           {flag} {point.country_code}
         </span>
       </div>
-      <div
-        style={{
-          fontSize: "0.85rem",
-          fontWeight: 500,
-          lineHeight: 1.35,
-          marginBottom: "0.35rem",
-          color: "#d8d8e8",
-        }}
-      >
+      <div className="mb-[0.35rem] text-[0.85rem] font-medium leading-[1.35] text-app-text-body">
         {point.name}
       </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginBottom: "0.35rem",
-        }}
-      >
-        <span style={{ fontSize: "0.72rem", color: "#888899" }}>
+      <div className="mb-[0.35rem] flex items-center gap-[6px]">
+        <span className="text-[0.72rem] text-app-text-secondary">
           {point.country}
         </span>
         <span
+          className="rounded-[3px] px-[5px] py-[1px] text-[0.63rem]"
           style={{
-            fontSize: "0.63rem",
-            padding: "1px 5px",
-            borderRadius: 3,
             background: color + "22",
             color,
             border: `1px solid ${color}44`,
@@ -135,56 +106,30 @@ function StaticPointCard({ point }: { point: StaticPoint }) {
           {point.code}
         </span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div className="flex flex-col gap-[2px]">
         {(type === "exchange" || type === "central_bank") &&
           Boolean(m.timezone) && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                fontSize: "0.7rem",
-              }}
-            >
-              <span style={{ color: "#888899" }}>Timezone</span>
-              <span style={{ color: "#c8c8d8" }}>{String(m.timezone)}</span>
+            <div className="flex justify-between gap-[12px] text-[0.7rem]">
+              <span className="text-app-text-secondary">Timezone</span>
+              <span className="text-app-text-body-dim">{String(m.timezone)}</span>
             </div>
           )}
         {type === "central_bank" && Boolean(m.currency) && (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              fontSize: "0.7rem",
-            }}
-          >
-            <span style={{ color: "#888899" }}>Currency</span>
-            <span style={{ color: "#c8c8d8" }}>{String(m.currency)}</span>
+          <div className="flex justify-between gap-[12px] text-[0.7rem]">
+            <span className="text-app-text-secondary">Currency</span>
+            <span className="text-app-text-body-dim">{String(m.currency)}</span>
           </div>
         )}
         {(type === "exchange" || type === "central_bank") &&
           Boolean(m.website) && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                fontSize: "0.7rem",
-              }}
-            >
-              <span style={{ color: "#888899" }}>Website</span>
+            <div className="flex justify-between gap-[12px] text-[0.7rem]">
+              <span className="text-app-text-secondary">Website</span>
               <a
                 href={`https://${String(m.website)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color, textDecoration: "none" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.textDecoration = "underline")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.textDecoration = "none")
-                }
+                className="no-underline hover:underline"
+                style={{ color }}
               >
                 {String(m.website)}
               </a>
@@ -192,23 +137,15 @@ function StaticPointCard({ point }: { point: StaticPoint }) {
           )}
         {type === "commodity_exchange" && Array.isArray(m.products) && (
           <div>
-            <div
-              style={{
-                fontSize: "0.68rem",
-                color: "#888899",
-                marginBottom: 4,
-              }}
-            >
+            <div className="mb-1 text-[0.68rem] text-app-text-secondary">
               Products
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            <div className="flex flex-wrap gap-1">
               {(m.products as string[]).map((p) => (
                 <span
                   key={p}
+                  className="rounded-[3px] px-[6px] py-[1px] text-[0.63rem]"
                   style={{
-                    fontSize: "0.63rem",
-                    padding: "1px 6px",
-                    borderRadius: 3,
                     background: color + "18",
                     color,
                     border: `1px solid ${color}44`,
@@ -223,42 +160,21 @@ function StaticPointCard({ point }: { point: StaticPoint }) {
         {type === "port" && (
           <>
             {Boolean(m.type) && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  fontSize: "0.7rem",
-                }}
-              >
-                <span style={{ color: "#888899" }}>Port type</span>
-                <span style={{ color: "#c8c8d8" }}>{String(m.type)}</span>
+              <div className="flex justify-between gap-[12px] text-[0.7rem]">
+                <span className="text-app-text-secondary">Port type</span>
+                <span className="text-app-text-body-dim">{String(m.type)}</span>
               </div>
             )}
             {Boolean(m.teu_rank) && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  fontSize: "0.7rem",
-                }}
-              >
-                <span style={{ color: "#888899" }}>TEU rank</span>
-                <span style={{ color: "#c8c8d8" }}>
+              <div className="flex justify-between gap-[12px] text-[0.7rem]">
+                <span className="text-app-text-secondary">TEU rank</span>
+                <span className="text-app-text-body-dim">
                   {`#${String(m.teu_rank)} globally`}
                 </span>
               </div>
             )}
             {Boolean(m.note) && (
-              <div
-                style={{
-                  fontSize: "0.68rem",
-                  color: "#888899",
-                  fontStyle: "italic",
-                  marginTop: 2,
-                }}
-              >
+              <div className="mt-[2px] text-[0.68rem] italic text-app-text-secondary">
                 {String(m.note)}
               </div>
             )}
@@ -439,17 +355,12 @@ function ClusteredMarkers({
             >
               <Popup closeButton={false} className="cr-popup">
                 <div
-                  style={{
-                    width: 264,
-                    background: "#16161f",
-                    fontFamily: "inherit",
-                  }}
+                  className="w-[264px] bg-app-card"
+                  style={{ fontFamily: "inherit" }}
                 >
                   {cluster.staticPoints.map((s, si) => (
                     <div key={s.code}>
-                      {si > 0 && (
-                        <div style={{ height: 1, background: "#2a2a3a" }} />
-                      )}
+                      {si > 0 && <div className="h-px bg-app-border-subtle" />}
                       <StaticPointCard point={s} />
                     </div>
                   ))}
@@ -473,47 +384,27 @@ function ClusteredMarkers({
             >
               <Popup closeButton={false} className="cr-popup">
                 <div
-                  style={{
-                    width: 264,
-                    background: "#16161f",
-                    fontFamily: "inherit",
-                  }}
+                  className="w-[264px] bg-app-card"
+                  style={{ fontFamily: "inherit" }}
                 >
                   <div
-                    style={{
-                      borderLeft: `3px solid ${color}`,
-                      padding: "0.65rem 0.8rem",
-                    }}
+                    className="px-[0.8rem] py-[0.65rem]"
+                    style={{ borderLeft: `3px solid ${color}` }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "0.32rem",
-                      }}
-                    >
+                    <div className="mb-[0.32rem] flex items-center justify-between">
                       <CategoryBadge category={ev.category} compact />
-                      <span style={{ fontSize: "0.7rem", color: "#666" }}>
+                      <span className="text-[0.7rem] text-app-text-muted">
                         {timeAgo(ev.started_at, lang)}
                       </span>
                     </div>
-                    <div
-                      style={{
-                        fontSize: "0.85rem",
-                        fontWeight: 500,
-                        lineHeight: 1.35,
-                        marginBottom: "0.38rem",
-                        color: "#d8d8e8",
-                      }}
-                    >
+                    <div className="mb-[0.38rem] text-[0.85rem] font-medium leading-[1.35] text-app-text-body">
                       {pick(ev as unknown as Record<string, unknown>, "title")}
                     </div>
                     <EventMeta event={ev} compact />
                   </div>
                   {cluster.staticPoints.map((sp) => (
                     <div key={sp.code}>
-                      <div style={{ height: 1, background: "#2a2a3a" }} />
+                      <div className="h-px bg-app-border-subtle" />
                       <StaticPointCard point={sp} />
                     </div>
                   ))}
@@ -533,25 +424,10 @@ function ClusteredMarkers({
           >
             <Popup closeButton={false} className="cr-popup" maxWidth={300}>
               <div
-                style={{
-                  width: 284,
-                  background: "#16161f",
-                  fontFamily: "inherit",
-                  maxHeight: 420,
-                  overflowY: "auto",
-                }}
+                className="w-[284px] max-h-[420px] overflow-y-auto bg-app-card"
+                style={{ fontFamily: "inherit" }}
               >
-                <div
-                  style={{
-                    padding: "0.55rem 0.8rem",
-                    borderBottom: "1px solid #2a2a3a",
-                    fontSize: "0.72rem",
-                    fontWeight: 600,
-                    color: "#888",
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase",
-                  }}
-                >
+                <div className="border-b border-app-border-subtle px-[0.8rem] py-[0.55rem] text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-app-text-secondary">
                   📍{" "}
                   {(() => {
                     const counts: Record<string, number> = {}
@@ -570,37 +446,21 @@ function ClusteredMarkers({
                     <div
                       key={ev.id}
                       onClick={() => onSelectEvent(ev.id)}
-                      style={{
-                        padding: "0.55rem 0.8rem",
-                        borderBottom: "1px solid #1e1e2a",
-                        borderLeft: `3px solid ${color}`,
-                        cursor: "pointer",
-                        background:
-                          selectedId === ev.id ? "#1e1e2e" : "transparent",
-                      }}
+                      className={cn(
+                        "cursor-pointer border-b border-app-border px-[0.8rem] py-[0.55rem]",
+                        selectedId === ev.id
+                          ? "bg-app-card-selected"
+                          : "bg-transparent"
+                      )}
+                      style={{ borderLeft: `3px solid ${color}` }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "0.2rem",
-                        }}
-                      >
+                      <div className="mb-[0.2rem] flex items-center justify-between">
                         <CategoryBadge category={ev.category} compact />
-                        <span style={{ fontSize: "0.68rem", color: "#555" }}>
+                        <span className="text-[0.68rem] text-app-text-ghost">
                           {timeAgo(ev.started_at, lang)}
                         </span>
                       </div>
-                      <div
-                        style={{
-                          fontSize: "0.82rem",
-                          fontWeight: 500,
-                          lineHeight: 1.3,
-                          color: "#d8d8e8",
-                          marginBottom: "0.2rem",
-                        }}
-                      >
+                      <div className="mb-[0.2rem] text-[0.82rem] font-medium leading-[1.3] text-app-text-body">
                         {pick(
                           ev as unknown as Record<string, unknown>,
                           "title"
@@ -612,7 +472,7 @@ function ClusteredMarkers({
                 })}
                 {cluster.staticPoints.map((sp) => (
                   <div key={sp.code}>
-                    <div style={{ height: 1, background: "#2a2a3a" }} />
+                    <div className="h-px bg-app-border-subtle" />
                     <StaticPointCard point={sp} />
                   </div>
                 ))}
@@ -670,12 +530,7 @@ export default function MapView({
         [90, 180],
       ]}
       maxBoundsViscosity={1.0}
-      style={{
-        height: "100%",
-        width: "100%",
-        background: "#191920",
-        direction: "ltr",
-      }}
+      className="h-full w-full bg-app-surface [direction:ltr]"
       zoomControl
     >
       <TileLayer

@@ -11,10 +11,10 @@ services:
   frontend:
     container_name: frontend
     build:
-      context: ./frontend
+      context: ./ui
       args:
         VITE_GA_ID: ${VITE_GA_ID:-}
-    command: sh -c "cp -r /app/dist/public/. /frontend_dist/"
+    command: sh -c "cp -r /app/dist/. /frontend_dist/"
     restart: "no"
     volumes:
       - ./frontend_dist:/frontend_dist

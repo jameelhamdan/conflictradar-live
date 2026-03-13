@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { useSubscribe } from "../hooks/useSubscribe"
 import { useLanguage } from "../contexts/LanguageContext"
+import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 export default function SubscribePopup() {
   const [open, setOpen] = useState(false)
@@ -35,64 +38,28 @@ export default function SubscribePopup() {
     open && rect
       ? createPortal(
           <>
+            <div onClick={() => setOpen(false)} className="fixed inset-0 z-[9998]" />
             <div
-              onClick={() => setOpen(false)}
-              style={{ position: "fixed", inset: 0, zIndex: 9998 }}
-            />
-            <div
+              className="subscribe-popup"
               style={{
-                position: "fixed",
                 top: rect.bottom + 8,
                 right: window.innerWidth - rect.right,
-                zIndex: 9999,
-                background: "#1a1a22",
-                border: "1px solid #2a2a35",
-                borderRadius: 8,
-                padding: "1rem",
-                width: 260,
-                boxShadow: "0 8px 32px #00000099",
               }}
             >
-              <div
-                style={{
-                  fontSize: "0.72rem",
-                  fontWeight: 700,
-                  color: "#e8e8f0",
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                  marginBottom: "0.5rem",
-                }}
-              >
+              <div className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.04em] text-app-text-heading">
                 {t.subscribeTitle}
               </div>
-              <p
-                style={{
-                  fontSize: "0.78rem",
-                  color: "#888899",
-                  margin: "0 0 0.75rem",
-                  lineHeight: 1.5,
-                }}
-              >
+              <p className="mb-3 text-[0.78rem] leading-[1.5] text-app-text-secondary">
                 {t.subscribeTagline}
               </p>
 
               {status === "success" ? (
-                <p
-                  style={{
-                    fontSize: "0.8rem",
-                    color: "#52c8a0",
-                    margin: 0,
-                    lineHeight: 1.5,
-                  }}
-                >
+                <p className="text-[0.8rem] leading-[1.5] text-app-accent-green">
                   {message ?? t.checkEmailConfirm}
                 </p>
               ) : (
-                <form
-                  onSubmit={handleSubmit}
-                  style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
-                >
-                  <input
+                <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                  <Input
                     type="email"
                     required
                     autoFocus
@@ -100,39 +67,17 @@ export default function SubscribePopup() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={status === "loading"}
-                    style={{
-                      background: "#13131c",
-                      border: "1px solid #2a2a35",
-                      borderRadius: 4,
-                      color: "#e8e8f0",
-                      fontSize: "0.82rem",
-                      padding: "0.45rem 0.6rem",
-                      outline: "none",
-                      width: "100%",
-                      boxSizing: "border-box",
-                    }}
+                    className="border-app-border-subtle bg-app-surface text-[0.82rem] text-app-text-heading placeholder:text-app-text-ghost focus-visible:border-app-border-subtle focus-visible:ring-0"
                   />
-                  <button
+                  <Button
                     type="submit"
                     disabled={status === "loading"}
-                    style={{
-                      background: "#e05252",
-                      border: "none",
-                      borderRadius: 4,
-                      color: "#fff",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      padding: "0.5rem 0",
-                      cursor: status === "loading" ? "default" : "pointer",
-                      opacity: status === "loading" ? 0.6 : 1,
-                    }}
+                    className="w-full border-none bg-app-accent-red text-[0.8rem] font-semibold text-white hover:bg-app-accent-red/90"
                   >
                     {status === "loading" ? t.subscribingLabel : t.subscribe}
-                  </button>
+                  </Button>
                   {status === "error" && message && (
-                    <p style={{ fontSize: "0.73rem", color: "#e05252", margin: 0 }}>
-                      {message}
-                    </p>
+                    <p className="text-[0.73rem] text-app-accent-red">{message}</p>
                   )}
                 </form>
               )}
@@ -147,18 +92,7 @@ export default function SubscribePopup() {
       <button
         ref={btnRef}
         onClick={toggle}
-        style={{
-          background: open ? "#e0525222" : "transparent",
-          border: `1px solid ${open ? "#e0525244" : "transparent"}`,
-          borderRadius: 4,
-          color: open ? "#e05252" : "#55556a",
-          fontSize: "0.8rem",
-          fontWeight: 600,
-          padding: "0.2rem 0.55rem",
-          cursor: "pointer",
-          transition: "color 0.12s, background 0.12s, border-color 0.12s",
-          flexShrink: 0,
-        }}
+        className={cn("subscribe-trigger", open ? "subscribe-trigger-open" : "subscribe-trigger-closed")}
       >
         {t.subscribe}
       </button>
@@ -166,4 +100,3 @@ export default function SubscribePopup() {
     </>
   )
 }
-

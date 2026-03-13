@@ -56,67 +56,18 @@ export default function CookieConsent() {
   if (!visible) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 9999,
-        background: "#13131c",
-        borderTop: "1px solid #2a2a3a",
-        padding: "0.9rem 1.25rem",
-        display: "flex",
-        alignItems: "center",
-        gap: "1rem",
-        flexWrap: "wrap",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <p
-        style={{
-          flex: 1,
-          minWidth: 220,
-          fontSize: "0.82rem",
-          color: "#888899",
-          lineHeight: 1.55,
-          margin: 0,
-        }}
-      >
+    <div className="cookie-banner">
+      <p className="m-0 min-w-[220px] flex-1 text-[0.82rem] leading-[1.55] text-app-text-secondary">
         {t.cookies.message}{" "}
-        <a href="/privacy" style={{ color: "#7c9ef8", textDecoration: "none" }}>
+        <a href="/privacy" className="text-app-accent-blue no-underline">
           {t.privacyLink}
         </a>
       </p>
-      <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-        <button
-          onClick={decline}
-          style={{
-            fontSize: "0.78rem",
-            fontWeight: 500,
-            padding: "0.35rem 0.85rem",
-            borderRadius: 6,
-            border: "1px solid #2a2a3a",
-            background: "transparent",
-            color: "#55556a",
-            cursor: "pointer",
-          }}
-        >
+      <div className="flex shrink-0 gap-2">
+        <button onClick={decline} className="cookie-btn-decline">
           {t.cookies.decline}
         </button>
-        <button
-          onClick={accept}
-          style={{
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            padding: "0.35rem 0.85rem",
-            borderRadius: 6,
-            border: "1px solid #7c9ef844",
-            background: "#7c9ef81a",
-            color: "#7c9ef8",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={accept} className="cookie-btn-accept">
           {t.cookies.accept}
         </button>
       </div>
