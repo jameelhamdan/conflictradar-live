@@ -1,3 +1,8 @@
+upstream api_backend {
+    server api:8000;
+    keepalive 32;
+}
+
 # HTTP — ACME challenge + redirect to HTTPS
 server {
     listen 80;
@@ -39,13 +44,24 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Use Docker's internal DNS — allows nginx to start even if upstream is temporarily down
-    resolver 127.0.0.11 valid=10s ipv6=off;
+    # SSE endpoint — disable buffering, long timeout for persistent connections
+    location /api/sse/ {
+        proxy_pass         http://api_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_buffering    off;
+        proxy_read_timeout 3600s;
+    }
 
     # Django REST API
     location /api/ {
-        set $backend http://backend:8000;
-        proxy_pass         $backend;
+        proxy_pass         http://api_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
@@ -57,8 +73,9 @@ server {
 
     # Django admin
     location /admin/ {
-        set $backend http://backend:8000;
-        proxy_pass         $backend;
+        proxy_pass         http://api_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;

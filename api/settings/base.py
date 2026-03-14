@@ -73,14 +73,10 @@ MIDDLEWARE = [
 ]
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",
-    "http://127.0.0.1:9000",
-    "http://localhost:5173",
-]
+CORS_ALLOWED_ORIGINS = []
 
 if DOMAIN := config('DOMAIN'):
-    CORS_ALLOWED_ORIGINS += [f'https://{DOMAIN}']
+    CORS_ALLOWED_ORIGINS = [f'https://{DOMAIN}']
 
 
 ROOT_URLCONF = 'app.urls'
