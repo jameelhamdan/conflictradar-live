@@ -19,11 +19,11 @@ class Command(BaseTaskCommand):
         )
         parser.add_argument(
             '--background', action='store_true',
-            help='Enqueue as a background RQ job instead of running directly',
+            help='Enqueue as a background Celery task instead of running directly',
         )
 
     def handle(self, *args, **kwargs):
-        from services.tasks import process_articles_job
+        from services.tasks import process_articles_task
 
         task_kwargs = dict(
             limit=kwargs['limit'],
@@ -32,9 +32,9 @@ class Command(BaseTaskCommand):
         )
 
         if kwargs['background']:
-            process_articles_job.delay(**task_kwargs)
-            self.stdout.write(self.style.SUCCESS('Enqueued process_articles_job'))
+            process_articles_task.delay(**task_kwargs)
+            self.stdout.write(self.style.SUCCESS('Enqueued process_articles_task'))
             return
 
-        count = process_articles_job(**task_kwargs)
+        count = process_articles_task(**task_kwargs)
         self.stdout.write(self.style.SUCCESS(f'Processed {count} articles'))

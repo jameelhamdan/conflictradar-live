@@ -3,6 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 import app
+from celery.schedules import crontab
 
 from decouple import config
 
@@ -26,7 +27,7 @@ ENV_NAME = config('ENV_NAME', default='development')
 VERSION = f'{ENV_NAME}-{app.__build__}'
 
 SECRET_KEY = config('SECRET_KEY')
-DEBUG = False
+DEBUG = config('DEBUG', default=False)
 
 ADMINS = (
     ('admin', 'contact@conflictradar.live'),
@@ -46,7 +47,6 @@ INSTALLED_APPS = [
     'django.contrib.sitemaps',
     'django.contrib.staticfiles',
 
-    'django_rq',
     'rest_framework',
     'import_export',
     'corsheaders',
@@ -75,7 +75,9 @@ MIDDLEWARE = [
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 CORS_ALLOWED_ORIGINS = []
 
-if DOMAIN := config('DOMAIN'):
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+elif DOMAIN := config('DOMAIN'):
     CORS_ALLOWED_ORIGINS = [f'https://{DOMAIN}']
 
 
@@ -124,10 +126,6 @@ LOGGING = {
         'verbose': {
             'format': '%(levelname)s %(asctime)s %(module)s %(filename)s %(funcName)s %(process)d %(thread)d %(threadName)s %(message)s',
         },
-        "rq_console": {
-            "format": "%(asctime)s %(message)s",
-            "datefmt": "%H:%M:%S",
-        },
     },
     'filters': {
         'require_debug_false': {
@@ -151,12 +149,6 @@ LOGGING = {
             'formatter': 'verbose',
             'stream': sys.stdout,
         },
-        "rq_console": {
-            "level": "DEBUG",
-            "class": "rq.logutils.ColorizingStreamHandler",
-            "formatter": "rq_console",
-            "exclude": ["%(asctime)s"],
-        },
     },
     'loggers': {
         'api': {
@@ -169,10 +161,15 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
-        'rq.worker': {
-            'handlers': ['console', 'rq_console'],
+        'celery': {
+            'handlers': ['api_handler'],
             'level': 'INFO',
-            'propagate': config('ENABLE_WORKER_ERROR_EMAILS', default=False, cast=bool),
+            'propagate': False,
+        },
+        'celery.task': {
+            'handlers': ['api_handler'],
+            'level': 'INFO',
+            'propagate': False,
         },
         'django.request': {
             'handlers': ['console'],
@@ -223,7 +220,6 @@ CACHES = {
     },
 }
 
-RQ_SHOW_ADMIN_LINK = True
 TASK_QUEUE_ENABLED = config('TASK_QUEUE_ENABLED', default=False, cast=bool)
 
 # LLM backend — 'openrouter' (default) or 'ollama'
@@ -238,19 +234,85 @@ OPENROUTER_MODELS = config('OPENROUTER_MODELS', default='openrouter/free')
 OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='')   # e.g. http://my-server:11434
 OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3')
 
-RQ_QUEUES = {
-    'high': {
-        'ASYNC': TASK_QUEUE_ENABLED,
-        'USE_REDIS_CACHE': 'redis-cache',
+# ── Celery ────────────────────────────────────────────────────────────────────
+_REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+
+CELERY_BROKER_URL = _REDIS_URL
+CELERY_RESULT_BACKEND = _REDIS_URL
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = 'UTC'
+CELERY_TASK_ALWAYS_EAGER = not TASK_QUEUE_ENABLED  # run synchronously when queue disabled
+CELERY_TASK_EAGER_PROPAGATES = True
+
+_JOB_TIMEOUT = int(config('JOB_TIMEOUT_SECONDS', default=1800))
+
+CELERY_BEAT_SCHEDULE = {
+    'fetch-articles': {
+        'task': 'services.tasks.fetch_articles_task',
+        'schedule': int(config('FETCH_INTERVAL_MINUTES', default=10)) * 60,
     },
-    'default': {
-        'ASYNC': TASK_QUEUE_ENABLED,
-        'USE_REDIS_CACHE': 'redis-cache',
+    'process-articles': {
+        'task': 'services.tasks.process_articles_task',
+        'schedule': int(config('PROCESS_INTERVAL_MINUTES', default=10)) * 60,
     },
-    'low': {
-        'ASYNC': TASK_QUEUE_ENABLED,
-        'USE_REDIS_CACHE': 'redis-cache',
+    'aggregate-events': {
+        'task': 'services.tasks.aggregate_events_task',
+        'schedule': int(config('AGGREGATE_INTERVAL_MINUTES', default=10)) * 60,
     },
+    'tag-topics': {
+        'task': 'services.tasks.tag_topics_task',
+        'schedule': int(config('TAG_TOPICS_INTERVAL_MINUTES', default=15)) * 60,
+    },
+    'refresh-topics': {
+        'task': 'services.tasks.refresh_topics_task',
+        'schedule': crontab(
+            hour=int(config('TOPICS_REFRESH_HOUR', default=4)),
+            minute=0,
+        ),
+    },
+    'fetch-prices': {
+        'task': 'services.tasks.fetch_prices_task',
+        'schedule': int(config('PRICE_FETCH_INTERVAL_MINUTES', default=5)) * 60,
+    },
+    'fetch-notams': {
+        'task': 'services.tasks.fetch_notams_task',
+        'schedule': int(config('NOTAM_FETCH_INTERVAL_MINUTES', default=15)) * 60,
+    },
+    'fetch-earthquakes': {
+        'task': 'services.tasks.fetch_earthquakes_task',
+        'schedule': int(config('EARTHQUAKE_FETCH_INTERVAL_MINUTES', default=5)) * 60,
+    },
+    'fetch-forex': {
+        'task': 'services.tasks.fetch_forex_task',
+        'schedule': int(config('FOREX_FETCH_INTERVAL_MINUTES', default=15)) * 60,
+    },
+    'run-forecasts': {
+        'task': 'services.tasks.run_forecast_task',
+        'schedule': int(config('FORECAST_INTERVAL_MINUTES', default=60)) * 60,
+    },
+    'score-forecasts': {
+        'task': 'services.tasks.score_forecasts_task',
+        'schedule': int(config('FORECAST_SCORE_INTERVAL_MINUTES', default=60)) * 60,
+    },
+    'generate-newsletter': {
+        'task': 'newsletter.tasks.generate_newsletter_task',
+        'schedule': crontab(
+            hour=int(config('NEWSLETTER_GENERATE_HOUR', default=6)),
+            minute=0,
+        ),
+    },
+    'discover-topics': {
+        'task': 'services.tasks.discover_topics_task',
+        'schedule': int(config('DISCOVER_TOPICS_INTERVAL_MINUTES', default=30)) * 60,
+    },
+    # TODO: enable after AWS SES is configured
+    # 'send-newsletter': {
+    #     'task': 'newsletter.tasks.send_newsletter_task',
+    #     'schedule': crontab(hour=int(config('NEWSLETTER_SEND_HOUR', default=7)), minute=0),
+    # },
 }
 
 # Email — provider selection: 'ses' (AWS SES) or 'smtp' (Django SMTP / console)

@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from newsletter.tasks import generate_newsletter_job
+from newsletter.tasks import generate_newsletter_task
 
 
 class Command(BaseCommand):
@@ -16,14 +16,14 @@ class Command(BaseCommand):
         parser.add_argument(
             '--background',
             action='store_true',
-            help='Enqueue as a background RQ job instead of running in the foreground.',
+            help='Enqueue as a background Celery task instead of running in the foreground.',
         )
 
     def handle(self, *args, **options):
         date_str = options.get('date')
         if options['background']:
-            generate_newsletter_job.delay(date_str=date_str)
+            generate_newsletter_task.delay(date_str=date_str)
             self.stdout.write(self.style.SUCCESS(f'Enqueued newsletter generation for {date_str or "today"}.'))
         else:
-            result = generate_newsletter_job(date_str=date_str)
+            result = generate_newsletter_task(date_str=date_str)
             self.stdout.write(self.style.SUCCESS(result))

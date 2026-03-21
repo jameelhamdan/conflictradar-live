@@ -9,9 +9,11 @@ interface EventListProps {
   events: EventSummary[]
   selectedId: string | null
   onSelectEvent: (id: string) => void
+  onTopicClick?: (slug: string) => void
+  activeTopic?: string | null
 }
 
-export default function EventList({ events, selectedId, onSelectEvent }: EventListProps) {
+export default function EventList({ events, selectedId, onSelectEvent, onTopicClick, activeTopic }: EventListProps) {
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function EventList({ events, selectedId, onSelectEvent }: EventLi
             cardRefs.current[ev.id] = el
           }}
         >
-          <EventCard event={ev} selected={selectedId === ev.id} onSelect={onSelectEvent} />
+          <EventCard event={ev} selected={selectedId === ev.id} onSelect={onSelectEvent} onTopicClick={onTopicClick} activeTopic={activeTopic} />
         </div>
       ))}
     </div>

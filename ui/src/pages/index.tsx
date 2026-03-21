@@ -3,13 +3,15 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import EventList from "../components/events/EventList";
 import PriceTicker from "../components/events/PriceTicker";
+import ForecastPanel from "../components/events/ForecastPanel";
 import { fetchEvents } from "../api/events";
 import { useSSE } from "../hooks/useSSE";
 import { SiteHeader } from "../components/layout";
 import { categoryColor, categoryShapeComponent } from "@/components/category";
 import { useLanguage } from "../contexts/LanguageContext";
 import { categoryLabel } from "../i18n/categories";
-import type { EventSummary, EventFilters } from "../types";
+import { fetchTopics } from "../api/topics";
+import type { EventSummary, EventFilters, Topic } from "../types";
 import { cn } from "@/lib/utils";
 
 const MapView = lazy(() => import("../components/events/MapView"));
@@ -47,6 +49,8 @@ export default function IndexPage() {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<EventFilters>({ category: "" });
+  const [activeTopic, setActiveTopic] = useState<string | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
   const [mounted, setMounted] = useState(false);
 
@@ -94,14 +98,35 @@ export default function IndexPage() {
         const offsetMs = QUICK_FILTERS.find((q) => q.value === quickFilter)!.ms;
         effectiveFilters = { ...filters, start: new Date(Date.now() - offsetMs).toISOString() };
       }
+      if (activeTopic) effectiveFilters = { ...effectiveFilters, topic: activeTopic };
       const data = await fetchEvents(effectiveFilters);
       setEvents(data.results);
     } catch (e) {
       console.error(e);
     }
-  }, [filters, quickFilter]);
+  }, [filters, quickFilter, activeTopic]);
+
+  function handleTopicClick(slug: string) {
+    setActiveTopic((prev) => (prev === slug ? null : slug));
+  }
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    fetchTopics({ active: true, top_level: true })
+      .then((data) =>
+        setTopics(
+          [...data]
+            .sort((a, b) => {
+              if (a.is_pinned && !b.is_pinned) return -1;
+              if (!a.is_pinned && b.is_pinned) return 1;
+              return (b.topic_score ?? b.event_count) - (a.topic_score ?? a.event_count);
+            })
+            .slice(0, 8),
+        ),
+      )
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     function check() {
@@ -210,6 +235,39 @@ export default function IndexPage() {
             );
           })}
         </div>
+
+        {topics.length > 0 && (
+          <div className="flex h-[34px] items-center gap-[0.2rem] overflow-x-auto border-t border-app-border px-3 [scrollbar-width:none]">
+            {topics.map((topic) => {
+              const isActive = activeTopic === topic.slug;
+              const color = topic.category ? categoryColor(topic.category) : "#7c9ef8";
+              return (
+                <button
+                  key={topic.slug}
+                  onClick={() => handleTopicClick(topic.slug)}
+                  title={topic.description ?? topic.name}
+                  className={cn("cat-tab", isActive ? "cat-tab-active" : "cat-tab-inactive")}
+                  style={{ "--cat-color": color } as React.CSSProperties}
+                >
+                  <span
+                    className="inline-block h-[5px] w-[5px] shrink-0 rounded-full"
+                    style={{ backgroundColor: isActive ? color : color + "99", flexShrink: 0 }}
+                  />
+                  {topic.name}
+                </button>
+              );
+            })}
+            {activeTopic && (
+              <button
+                onClick={() => setActiveTopic(null)}
+                title="Clear topic filter"
+                className="shrink-0 cursor-pointer rounded border-none bg-transparent px-[0.25rem] py-[0.1rem] text-[0.7rem] leading-none text-app-text-ghost"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       <main className="relative flex flex-1 overflow-hidden">
@@ -261,7 +319,8 @@ export default function IndexPage() {
           )}
         >
           <PriceTicker latestTick={latestPriceTick} />
-          <EventList events={events} selectedId={selectedId} onSelectEvent={handleSelectEvent} />
+          <ForecastPanel />
+          <EventList events={events} selectedId={selectedId} onSelectEvent={handleSelectEvent} onTopicClick={handleTopicClick} activeTopic={activeTopic} />
         </section>
       </main>
 

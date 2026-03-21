@@ -1,4 +1,4 @@
-# CLAUDE.md — Radar-Live Dev Guide
+# CLAUDE.md — Happinga-Meter Dev Guide
 
 This file gives Claude everything needed to write correct, consistent code for this project without re-reading the codebase from scratch each session.
 
@@ -9,11 +9,12 @@ This file gives Claude everything needed to write correct, consistent code for t
 | Layer | Tech |
 |-------|------|
 | Backend | Django 6 + django-mongodb-backend |
-| Task queue | Redis + RQ + django-rq |
+| Task queue | Celery + Redis (broker + result backend) |
+| Scheduling | Celery Beat (static `CELERY_BEAT_SCHEDULE` in settings) |
 | Storage | MongoDB 8 |
 | Ingestion | Telethon (Telegram) + requests |
-| NLP | spaCy + VADER + geopy |
-| Frontend | React 19 + Vite + react-leaflet |
+| NLP | sentence-transformers + VADER + geopy |
+| Frontend | React 19 + Waku + react-leaflet (TypeScript) |
 | Serving | uvicorn (backend) + nginx reverse proxy |
 | Containers | Docker Compose |
 
@@ -25,24 +26,28 @@ This file gives Claude everything needed to write correct, consistent code for t
 
 ```
 ./
-├── backend/                # All Django/Python source (Docker build context: ./backend, PYTHONPATH=/app)
-│   ├── app/                # WSGI/ASGI entry, URLs, middleware, auth backend
-│   │   ├── __init__.py     # Version info (reads version.txt from project root)
+├── api/                    # All Django/Python source (Docker build context: ./api, PYTHONPATH=/app)
+│   ├── app/                # WSGI/ASGI entry, Celery app, URLs, middleware, auth backend
+│   │   ├── __init__.py     # Imports celery_app so it loads with Django
+│   │   ├── celery.py       # Celery app init — app = Celery("app"); autodiscover_tasks()
 │   │   ├── asgi.py         # ASGI application entry point
-│   │   ├── wsgi.py         # WSGI application entry point (unused; uvicorn runs asgi.py)
 │   │   ├── urls.py         # Root URLconf — admin/ + api/
 │   │   ├── backends.py     # ModelAuthBackend (respects user.can_login)
 │   │   └── middleware.py   # X-App-Version header
 │   ├── apps.py             # MongoAdminConfig, MongoAuthConfig, MongoContentTypesConfig
 │   ├── core/               # Django app — data models + management commands
 │   │   ├── apps.py         # name='core', label='core'
-│   │   ├── models.py       # Source, Article, Event + ArticleDocument/ArticleFeatures
-│   │   ├── tasks.py        # fetch_articles, process_articles, aggregate_events
-│   │   ├── admin.py
+│   │   ├── models.py       # Source, Article, Event, Topic, PriceTick, NotamZone,
+│   │   │                   # EarthquakeRecord, StaticPoint, Forecast
+│   │   ├── admin.py        # Admin for all core models
 │   │   └── management/commands/
-│   │       ├── fetch_data.py        # Thin wrapper → tasks.fetch_articles
-│   │       ├── process_articles.py  # Thin wrapper → tasks.process_articles
-│   │       └── aggregate_events.py  # Thin wrapper → tasks.aggregate_events
+│   │       ├── fetch_data.py           # Enqueues fetch_articles_task
+│   │       ├── process_articles.py     # Enqueues process_articles_task
+│   │       ├── aggregate_events.py     # Enqueues aggregate_events_task
+│   │       ├── refresh_topics.py       # Enqueues refresh_topics_task
+│   │       ├── tag_topics.py           # Enqueues tag_topics_task
+│   │       ├── retroactive_tag_topic.py # Enqueues retroactive_tag_topic_task
+│   │       └── e2e_pipeline.py         # End-to-end pipeline test → JSON report
 │   ├── accounts/           # Custom User model + Session + Group proxies
 │   │   ├── apps.py         # name='accounts', label='accounts'
 │   │   ├── models.py       # User (email-based), UserManager
@@ -50,51 +55,87 @@ This file gives Claude everything needed to write correct, consistent code for t
 │   ├── api/                # DRF REST API
 │   │   ├── apps.py         # name='api', label='api'
 │   │   ├── serializers.py
-│   │   ├── views.py        # EventListView, EventDetailView, SourceListView
-│   │   └── urls.py
+│   │   ├── urls.py
+│   │   └── views/          # EventListView, EventDetailView, TopicListView, etc.
+│   ├── newsletter/         # Django app — newsletter models + admin + tasks
+│   │   ├── models.py       # DailyNewsletter
+│   │   ├── admin.py
+│   │   ├── tasks.py        # generate_newsletter_task, send_newsletter_task
+│   │   └── management/commands/
 │   ├── services/           # Stateless Python services (no Django models)
-│   │   ├── cleaning/       # NLP — import as services.cleaning
-│   │   │   ├── __init__.py # exports: ArticleCleaner, categorize, CleaningError
-│   │   │   ├── cleaner.py  # ArticleCleaner — spaCy NER + VADER + categorization
-│   │   │   ├── categorizer.py
-│   │   │   └── exceptions.py
-│   │   ├── location/       # Geocoding — import as services.location
-│   │   │   ├── __init__.py # exports: Geocoder
-│   │   │   └── geocoder.py # Nominatim via geopy, 30-day cache
-│   │   └── data/           # Ingestion — import as services.data
-│   │       ├── __init__.py # exports DataService
-│   │       ├── base.py
-│   │       └── telegram.py
+│   │   ├── tasks.py        # All Celery @shared_task entrypoints
+│   │   ├── workflow.py     # Workflow class — orchestrates pipeline steps
+│   │   ├── processing/     # NLP processing pipeline
+│   │   │   ├── analyzer.py     # Article analysis (NER, sentiment, geocoding)
+│   │   │   ├── cleaner.py      # Text cleaning
+│   │   │   └── clustering.py   # SemanticClusterer — sentence-transformers
+│   │   ├── topics/         # Topic management
+│   │   │   ├── matcher.py      # TopicMatcher (keyword) + LLMTopicMatcher (batch LLM)
+│   │   │   ├── scraper.py      # Orchestrates source adapters; TOPIC_SOURCES env var
+│   │   │   ├── dedup.py        # Deduplication + semantic_merge_topics
+│   │   │   ├── types.py        # TopicDict TypedDict
+│   │   │   ├── _dates.py       # Date helpers — parses "March 2025" and "2022"
+│   │   │   └── sources/        # Per-source adapters
+│   │   │       ├── ongoing.py          # WikipediaOngoingConflictsAdapter (~30–60 named conflicts)
+│   │   │       └── current_situations.py # WikipediaCurrentSituationsAdapter (7-day prefix extraction)
+│   │   ├── streams/        # Real-time data streams (prices, NOTAM, earthquakes, forex)
+│   │   ├── data/           # Ingestion — DataService, ArticleDatum
+│   │   │   ├── __init__.py     # exports DataService
+│   │   │   ├── base.py         # ArticleDatum TypedDict
+│   │   │   └── sources/        # Per-source scrapers
+│   │   ├── forecasting/    # LLM market forecasting
+│   │   │   ├── service.py      # run_forecasts(), score_forecasts()
+│   │   │   ├── features.py     # build_feature_vector() — price + news features
+│   │   │   └── routing.py      # route_event_to_symbols() — maps events to symbols
+│   │   ├── newsletter/     # Newsletter generation + sending
+│   │   │   ├── generator.py    # generate_newsletter() — LLM-based section writer
+│   │   │   └── sender.py       # send_newsletter() — Markdown→HTML, SES
+│   │   ├── email/          # Email delivery helpers
+│   │   └── llm.py          # LLM client wrapper
 │   ├── migrations/         # All app migrations (centralized, mapped via MIGRATION_MODULES)
 │   │   ├── accounts/
 │   │   ├── admin/
 │   │   ├── auth/
 │   │   ├── contenttypes/
-│   │   └── core/
+│   │   ├── core/
+│   │   ├── misc/
+│   │   └── newsletter/
 │   ├── settings/
-│   │   └── base.py         # All config — DB, cache, RQ, auth, logging
+│   │   └── base.py         # All config — DB, cache, Celery, Beat schedule, auth, logging
+│   ├── templates/
+│   │   ├── admin/core/
+│   │   └── admin/misc/
+│   │       └── celery_monitor.html  # Django admin Celery task viewer
 │   ├── manage.py           # Django CLI
 │   ├── requirements.txt
-│   ├── release.sh          # collectstatic + migrate (run by Docker on backend startup)
-│   ├── Dockerfile          # Python image — build context: ./backend, PYTHONPATH=/app
-│   └── worker.py           # RQ workers + scheduler + health check
-├── frontend/               # React 19 SPA
+│   ├── release.sh          # collectstatic + migrate (run by Docker on api startup)
+│   └── Dockerfile
+├── ui/                     # React 19 + Waku SPA (TypeScript)
 │   ├── src/
-│   │   ├── App.jsx         # Root component — polling, filters, layout
-│   │   ├── api/events.js   # fetchEvents(), fetchEventDetail()
-│   │   └── components/
-│   │       ├── MapView.jsx     # Leaflet map + CircleMarkers
-│   │       ├── EventList.jsx   # Scrollable event list
-│   │       └── EventCard.jsx   # Expandable event card with articles
-│   ├── vite.config.js      # Dev proxy /api → localhost:8000
-│   ├── Dockerfile          # Multi-stage: node build → nginx serve
-│   └── nginx.conf          # SPA-only: try_files + static asset caching
+│   │   ├── pages/          # Waku file-based routes
+│   │   │   └── index.tsx   # Main map page — activeTopic state, TopicsPanel + EventList
+│   │   ├── api/            # Typed API client modules
+│   │   │   ├── events.ts   # fetchEvents(), fetchEventDetail()
+│   │   │   ├── newsletter.ts
+│   │   │   ├── streams.ts
+│   │   │   └── topics.ts   # fetchTopics(), fetchTopicDetail()
+│   │   ├── components/
+│   │   │   ├── events/
+│   │   │   │   ├── EventCard.tsx     # Topic badges; onTopicClick prop
+│   │   │   │   ├── EventList.tsx     # Passes topic props down
+│   │   │   │   ├── EventUI.tsx
+│   │   │   │   ├── ForecastPanel.tsx # LLM market forecast display
+│   │   │   │   └── MapView.tsx       # L.divIcon category markers
+│   │   │   └── topics/
+│   │   │       └── TopicsPanel.tsx   # Active topics pill list, category colors
+│   │   └── types.ts        # Topic interface, EventSummary.topic_slugs, EventFilters.topic
+│   ├── vite.config.ts      # Dev proxy /api → localhost:8000
+│   └── Dockerfile
 ├── nginx/
-│   ├── templates/
-│   │   └── default.conf.template  # nginx reverse proxy template (envsubst)
-│   └── init-letsencrypt.sh # One-time TLS bootstrap (run from project root)
+│   └── templates/
+│       └── default.conf.template  # nginx reverse proxy template (envsubst)
 ├── version.txt             # Application version string
-├── docker-compose.yml      # nginx, certbot, backend, worker, frontend, mongo, redis
+├── docker-compose.yml      # nginx, certbot, api, worker, beat, flower, frontend, mongo, redis
 └── CLAUDE.md               # ← you are here
 ```
 
@@ -104,7 +145,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 
 ### Django Apps
 
-- Django apps (`core`, `accounts`, `api`) live directly under `backend/` with simple names:
+- Django apps (`core`, `accounts`, `api`, `newsletter`) live directly under `api/` with simple names:
   ```python
   name = 'core'
   label = 'core'
@@ -113,17 +154,17 @@ This file gives Claude everything needed to write correct, consistent code for t
 - `AUTH_USER_MODEL = 'accounts.User'` (label-based, not import path)
 - Never import `accounts.User` directly — always use `get_user_model()`
 - Always import models explicitly: `from core import models as core_models`
-- `apps.py` at `backend/apps.py` defines `MongoAdminConfig`, `MongoAuthConfig`, `MongoContentTypesConfig` — these set `default_auto_field = ObjectIdAutoField` for Django's built-in apps
+- `apps.py` at `api/apps.py` defines `MongoAdminConfig`, `MongoAuthConfig`, `MongoContentTypesConfig` — these set `default_auto_field = ObjectIdAutoField` for Django's built-in apps
 
 ### Migrations
 
-- All migrations are centralized under `backend/migrations/` and mapped via `MIGRATION_MODULES` in settings
-- Django built-in apps (`auth`, `admin`, `contenttypes`) use custom MongoDB-compatible migrations in `migrations/auth/`, `migrations/admin/`, `migrations/contenttypes/` — all use `ObjectIdAutoField` PKs
+- All migrations are centralized under `api/migrations/` and mapped via `MIGRATION_MODULES` in settings
+- Django built-in apps (`auth`, `admin`, `contenttypes`) use custom MongoDB-compatible migrations — all use `ObjectIdAutoField` PKs
 - Never run `makemigrations` for `auth`, `admin`, or `contenttypes` — manage those manually
 
 ### Models
 
-- All core data models (`Article`, `Event`) use `MongoManager` from `django-mongodb-backend`
+- All core data models use `MongoManager` from `django-mongodb-backend`
 - Never use `__date` ORM lookup on MongoDB — use explicit datetime range:
   ```python
   # Wrong
@@ -138,10 +179,111 @@ This file gives Claude everything needed to write correct, consistent code for t
   ```
 - `Article.banner_image_url` — nullable URLField; populated by RSS `media:content`/`media:thumbnail`/enclosure extraction at fetch time, or OG image scrape during `process_articles` (best-effort, HTTPS only)
 - `Event.started_at` is a DateTimeField — always timezone-aware (`django.utils.timezone.now()`)
+- `Event.topic_slugs` — list of matched topic slugs (tagged by `tag_topics_task`)
+- `CeleryMonitor` is an **unmanaged** model (`managed = False`) in the `misc` app — exists only as an admin registration hook, has no DB table
+
+### Tasks / Background Jobs
+
+All Celery tasks live in `services/tasks.py` (pipeline + streams + topics + forecasting) and `newsletter/tasks.py`.
+
+- Decorator: `@shared_task(time_limit=JOB_TIMEOUT_SECONDS, max_retries=2, default_retry_delay=60)`
+- Enqueue: `my_task.delay(arg1, kwarg=val)` — never `queue.enqueue(...)`, never `django_rq`
+- Task names follow the `*_task` suffix convention
+- Management commands call task functions **directly** (not via `.delay()`) for inline/foreground execution; use `--background` to enqueue instead
+
+To add a new background task:
+1. Write the function in `services/tasks.py` with `@shared_task`
+2. Call it: `my_task.delay(...)`
+3. Add a schedule entry to `CELERY_BEAT_SCHEDULE` in `settings/base.py` if periodic
+
+**Never use `django_rq`, `rq`, or `schedule` — those are removed.**
+
+### Scheduling (Celery Beat)
+
+All periodic jobs are defined in `CELERY_BEAT_SCHEDULE` in `api/settings/base.py`. The `beat` Docker service runs `celery -A app beat`. Schedule is static (no `django-celery-beat` DB backend).
+
+| Beat key | Task | Default interval |
+|---|---|---|
+| `fetch-articles` | `services.tasks.fetch_articles_task` | 10m |
+| `process-articles` | `services.tasks.process_articles_task` | 10m |
+| `aggregate-events` | `services.tasks.aggregate_events_task` | 10m |
+| `tag-topics` | `services.tasks.tag_topics_task` | 15m |
+| `refresh-topics` | `services.tasks.refresh_topics_task` | daily at 04:00 |
+| `fetch-prices` | `services.tasks.fetch_prices_task` | 5m |
+| `fetch-notams` | `services.tasks.fetch_notams_task` | 15m |
+| `fetch-earthquakes` | `services.tasks.fetch_earthquakes_task` | 5m |
+| `fetch-forex` | `services.tasks.fetch_forex_task` | 15m |
+| `run-forecasts` | `services.tasks.run_forecast_task` | 60m |
+| `score-forecasts` | `services.tasks.score_forecasts_task` | 60m |
+| `generate-newsletter` | `newsletter.tasks.generate_newsletter_task` | daily at 06:00 |
+
+### Celery App Init
+
+`api/app/celery.py`:
+```python
+import os
+from celery import Celery
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings.base")
+app = Celery("app")
+app.config_from_object("django.conf:settings", namespace="CELERY")
+app.autodiscover_tasks()
+```
+
+`api/app/__init__.py` imports `celery_app` so it loads when Django starts:
+```python
+from .celery import app as celery_app
+__all__ = ("celery_app",)
+```
+
+### Worker
+
+The Celery worker is started directly with the `celery` CLI — no wrapper script:
+
+```bash
+celery -A app worker --loglevel=info --concurrency=4
+```
+
+In Docker, the `worker` service uses `WORKER_COUNT` from the env file:
+```
+command: sh -c "celery -A app worker --loglevel=info --concurrency=$${WORKER_COUNT:-4}"
+```
+
+### Semantic Clustering
+
+`api/services/processing/clustering.py`:
+- `SemanticClusterer.cluster(articles, threshold=0.55)` — groups articles by title similarity
+- Model: `paraphrase-multilingual-MiniLM-L12-v2` (multilingual, ~90 MB, CPU-only)
+- Uses `sentence_transformers.util.community_detection()` with `min_community_size=1`
+- Model loaded lazily via `@cached_property`; singleton via `get_clusterer()`
+- Called during `aggregate_events` AFTER geographic + category bucketing
+
+### Forecasting
+
+`api/services/forecasting/`:
+- `service.py` — `run_forecasts()`: builds feature vector per symbol, calls LLM with structured prompt, stores `Forecast` object; `score_forecasts()`: fills `actual_value` once horizon elapses
+- `features.py` — `build_feature_vector(symbol, at_time)`: price momentum (1h/24h), news sentiment mean/std, event intensity, category counts, routed event IDs
+- `routing.py` — `route_event_to_symbols(category, location, topic_slugs)`: maps event attributes to affected market symbols (e.g. conflict + Ukraine → wheat, energy)
+- Default symbols: Gold, Crude Oil, Natural Gas, Wheat, BTC, ETH, SPY, DXY, 10Y Treasury
+- `Forecast` model fields: `symbol`, `stream_key`, `direction` (up/down/neutral), `confidence`, `predicted_value`, `actual_value`, `reasoning`, `event_ids`, `feature_vector`
+- API: `GET /api/forecasts/` (filter by symbol/stream_key/horizon), `GET /api/forecasts/latest/` (latest per symbol)
+
+### Topics
+
+`api/services/topics/`:
+- `matcher.py` — two matchers:
+  - `TopicMatcher` — keyword-overlap; used by `retroactive_tag_topic` (fast, no LLM)
+  - `LLMTopicMatcher` — batch LLM semantic matching; used by `tag_events_with_topics`; sends 10 events per call; falls back to `TopicMatcher` per-event on any LLM error
+- `scraper.py` — runs `WikipediaCurrentEventsAdapter`; lookback window via `TOPIC_SOURCES_DAYS` env var (default: `30`)
+- `sources/current_events.py` — `WikipediaCurrentEventsAdapter`: fetches `Portal:Current_events` daily subpages going back `num_days`; extracts situation-level prefixes (text before `:` in bullets); category from section heading
+- `dedup.py` — `deduplicate_topics()` (slug-level) + `semantic_merge_topics()` (cosine ≥ 0.85)
+- `_dates.py` — `parse_approximate_date()`: handles `"October 2023"` and year-only `"2014"`
+- `Topic` model fields: `slug`, `name`, `keywords`, `description`, `category`, `is_current`, `is_active`, `source_ids`, `started_at`, `ended_at`, `topic_score`, `is_top_level`, `is_pinned`, `historical_month/day/year`
+- `is_current` — in today's news cycle; `is_active` — enabled for display; `is_top_level` — promoted by score ≥ `TOP_LEVEL_SCORE_THRESHOLD` or `is_pinned`
+- Frontend API: `GET /api/topics/?active=true&current=true`
 
 ### Newsletter
 
-- `DailyNewsletter` lives in `backend/newsletter/models.py` — fields: `date` (unique), `subject`, `body` (Markdown), `articles` (JSON snapshot), `cover_image_url`, `cover_image_credit`, `status`, `event_count`
+- `DailyNewsletter` lives in `api/newsletter/models.py` — fields: `date` (unique), `subject`, `body` (Markdown), `articles` (JSON snapshot), `cover_image_url`, `cover_image_credit`, `status`, `event_count`
 - Newsletter body is stored as **Markdown** and converted to HTML at send time in `sender.py` — `<h2>` tags get inline-styled for email client compatibility
 - `generate_newsletter()` in `services/newsletter/generator.py` — groups events by category, sends per-category LLM prompt, stores article snapshot + cover image; idempotent (skips if date exists)
 - `send_newsletter()` in `services/newsletter/sender.py` — converts Markdown → HTML, sends to active subscribers; skips already-sent newsletters
@@ -149,13 +291,12 @@ This file gives Claude everything needed to write correct, consistent code for t
 - Frontend newsletter route: `/newsletter` (list + reader), `/newsletter/YYYY/MM/DD` (direct date URL — falls back to latest published if date not found)
 - `NewsletterView` accepts an optional `initialData` prop — pass it to skip the internal fetch when data is already loaded
 
-### NLP / Cleaning
+### NLP / Processing
 
-- `services/cleaning/` is a plain Python module — import with `from services.cleaning import ...`
-- `ArticleCleaner().clean_batch(documents)` returns `list[ArticleFeatures]` (Step 2 in pipeline)
-- `ArticleFeatures` now includes `category` — no need to call `categorize()` separately after cleaning
+- `services/processing/analyzer.py` — main article processing (NER, sentiment, geocoding)
+- `services/processing/cleaner.py` — text normalization
+- `services/processing/clustering.py` — semantic event grouping (see above)
 - `ArticleDocument` and `ArticleFeatures` dataclasses live in `core/models.py`
-- `categorize(text)` is still importable from `services.cleaning` for ad-hoc use
 
 ### API (DRF)
 
@@ -163,35 +304,25 @@ This file gives Claude everything needed to write correct, consistent code for t
 - All responses serialized via DRF serializers in `api/serializers.py`
 - No raw `JsonResponse` — use `Response` from `rest_framework.response`
 - URL pattern: `/api/<resource>/` list, `/api/<resource>/<id>/` detail
-
-### Tasks / Background Jobs
-
-- All task logic lives in `core/tasks.py` as plain callables
-- Management commands are thin wrappers that parse args then call or enqueue the task
-- The scheduler in `worker.py` enqueues task functions directly — never `call_command`
-- To add a new background task:
-  1. Write the function in `core/tasks.py`
-  2. Enqueue it: `django_rq.get_queue('default').enqueue(my_task, arg, job_timeout=1800)`
-  3. Schedule it in `run_scheduler()` if periodic
-- `worker.py` calls `django.setup()` exactly once in `run_scheduler()` — never again elsewhere
-- Always pass `job_timeout=1800` (30 min) to every `queue.enqueue(...)` call
+- Topic endpoints: `/api/topics/`, `/api/topics/<slug>/`, `/api/topics/<slug>/events/`
 
 ### Frontend
 
-- All API calls go through typed modules in `src/api/` (`events.ts`, `newsletter.ts`, etc.)
-- React state lives in `App.tsx`; pass down as props
+- All API calls go through typed modules in `src/api/` (`events.ts`, `newsletter.ts`, `streams.ts`, `topics.ts`)
+- React state lives in `src/pages/index.tsx`; pass down as props
 - Map markers use custom `L.divIcon` via category shape SVG; never plain `Marker` with default icon
 - Frontend uses **Waku** for file-based routing under `src/pages/`; static pages use `render: 'static'`, dynamic pages use `render: 'dynamic'`
 - Dynamic pages read route params from `window.location.pathname` (no Waku router hook needed)
+- All source files are TypeScript (`.tsx`/`.ts`) — not `.jsx`/`.js`
 - Dark theme color palette (inline styles):
   - Background: `#0f0f13`
   - Card: `#1a1a22`
   - Border: `#2a2a35`
   - Text primary: `#e8e8f0`
   - Text secondary: `#888899`
-- Category colors (defined in `MapView.jsx` and `EventCard.jsx` — keep in sync):
-  ```js
-  const CATEGORY_COLOR = {
+- Category colors (defined in `MapView.tsx` and `EventCard.tsx` — keep in sync):
+  ```ts
+  const CATEGORY_COLOR: Record<string, string> = {
     conflict:  '#e05252',
     protest:   '#e09652',
     disaster:  '#e0c852',
@@ -201,6 +332,9 @@ This file gives Claude everything needed to write correct, consistent code for t
     general:   '#888',
   }
   ```
+- Topic filtering: `activeTopic: string | null` state in `index.tsx`; passed to `fetchEvents()` as `?topic=<slug>` and down to `EventList` / `EventCard` for badge highlighting
+- `TopicsPanel` fetches `active=true&current=true` topics; clicking a topic pill toggles `activeTopic`
+- `EventCard` renders up to 3 topic slug badges; active badge highlighted in blue; overflow shown as `+N more`
 
 ---
 
@@ -208,46 +342,48 @@ This file gives Claude everything needed to write correct, consistent code for t
 
 ### Add a new API endpoint
 
-1. Add serializer to [backend/api/serializers.py](backend/api/serializers.py)
-2. Add view to [backend/api/views.py](backend/api/views.py) — subclass `APIView` or `generics.ListAPIView`
-3. Register URL in [backend/api/urls.py](backend/api/urls.py)
-4. Add fetch function in [frontend/src/api/events.js](frontend/src/api/events.js)
+1. Add serializer to `api/api/serializers.py`
+2. Add view to `api/api/views/` — subclass `APIView` or `generics.ListAPIView`
+3. Register URL in `api/api/urls.py`
+4. Add fetch function in `ui/src/api/`
 
 ### Add a new model field
 
-1. Add field to model in [backend/core/models.py](backend/core/models.py)
-2. Run `python backend/manage.py makemigrations core`
-3. Update relevant serializer in [backend/api/serializers.py](backend/api/serializers.py)
-4. Update admin in [backend/core/admin.py](backend/core/admin.py) if needed
+1. Add field to model in `api/core/models.py`
+2. Run `python manage.py makemigrations core`
+3. Update relevant serializer in `api/api/serializers.py`
+4. Update admin in `api/core/admin.py` if needed
 
 ### Add a new management command
 
-1. Create `backend/core/management/commands/<name>.py`
+1. Create `api/core/management/commands/<name>.py`
 2. Subclass `BaseCommand`, implement `handle(self, *args, **options)`
 3. Import models as `from core import models as core_models`
-4. Add enqueue helper in [backend/worker.py](backend/worker.py): `queue.enqueue(my_task, job_timeout=JOB_TIMEOUT_SECONDS)`
-5. Register schedule in `run_scheduler()` if periodic
+4. Call `my_task.delay(...)` for background execution (no `queue.enqueue`)
 
 ### Add a new scheduled job
 
-In [backend/worker.py](backend/worker.py) inside `run_scheduler()`:
+In `api/settings/base.py` inside `CELERY_BEAT_SCHEDULE`:
 ```python
-schedule.every(N).minutes.do(enqueue_my_job)
+'my-job': {
+    'task': 'services.tasks.my_task',
+    'schedule': 600,  # seconds, or crontab(...)
+},
 ```
-Define `enqueue_my_job()` above it following the existing pattern.
+Define `my_task` in `services/tasks.py` with `@shared_task`.
 
 ### Add a new React component
 
-1. Create `frontend/src/components/MyComponent.jsx`
+1. Create `ui/src/components/MyComponent.tsx`
 2. Use inline styles matching the dark theme palette above
-3. Import and use in `App.jsx` or a parent component
+3. Import and use in a page or parent component
 
 ### Add a new filter to /api/events/
 
-1. Add query param parsing in `EventListView.get()` in [backend/api/views.py](backend/api/views.py)
+1. Add query param parsing in `EventListView.get()` in `api/api/views/events.py`
 2. Chain `.filter(...)` on the queryset
-3. Add param to `fetchEvents(filters)` in [frontend/src/api/events.js](frontend/src/api/events.js)
-4. Add UI control in `App.jsx`
+3. Add param to `fetchEvents(filters)` in `ui/src/api/events.ts`
+4. Add UI control; manage state in `ui/src/pages/index.tsx`
 
 ---
 
@@ -255,48 +391,96 @@ Define `enqueue_my_job()` above it following the existing pattern.
 
 | Purpose | File |
 |---------|------|
-| Data models | [backend/core/models.py](backend/core/models.py) |
-| Pipeline tasks | [backend/core/tasks.py](backend/core/tasks.py) |
-| API views | [backend/api/views.py](backend/api/views.py) |
-| API serializers | [backend/api/serializers.py](backend/api/serializers.py) |
-| API URLs | [backend/api/urls.py](backend/api/urls.py) |
-| Worker + scheduler | [backend/worker.py](backend/worker.py) |
-| Django settings | [backend/settings/base.py](backend/settings/base.py) |
-| Root URLs | [backend/app/urls.py](backend/app/urls.py) |
-| Mongo app configs | [backend/apps.py](backend/apps.py) |
-| React root | [frontend/src/components/App.tsx](frontend/src/components/App.tsx) |
-| API client (events) | [frontend/src/api/events.ts](frontend/src/api/events.ts) |
-| API client (newsletter) | [frontend/src/api/newsletter.ts](frontend/src/api/newsletter.ts) |
-| Map component | [frontend/src/components/events/MapView.tsx](frontend/src/components/events/MapView.tsx) |
-| Newsletter models | [backend/newsletter/models.py](backend/newsletter/models.py) |
-| Newsletter generator | [backend/services/newsletter/generator.py](backend/services/newsletter/generator.py) |
-| Newsletter sender | [backend/services/newsletter/sender.py](backend/services/newsletter/sender.py) |
-| Waku pages | [frontend/src/pages/](frontend/src/pages/) |
-| Docker services | [docker-compose.yml](docker-compose.yml) |
-| Python deps | [backend/requirements.txt](backend/requirements.txt) |
+| Data models | `api/core/models.py` |
+| Celery app init | `api/app/celery.py` |
+| All Celery tasks | `api/services/tasks.py` |
+| Pipeline orchestration | `api/services/workflow.py` |
+| Semantic clustering | `api/services/processing/clustering.py` |
+| Topic matching (keyword) | `api/services/topics/matcher.py` → `TopicMatcher` |
+| Topic matching (LLM batch) | `api/services/topics/matcher.py` → `LLMTopicMatcher` |
+| Topic source | `api/services/topics/sources/current_events.py` |
+| Beat schedule | `api/settings/base.py` → `CELERY_BEAT_SCHEDULE` |
+| API views | `api/api/views/` |
+| API serializers | `api/api/serializers.py` |
+| API URLs | `api/api/urls.py` |
+| Django settings | `api/settings/base.py` |
+| Root URLs | `api/app/urls.py` |
+| Mongo app configs | `api/apps.py` |
+| Celery admin template | `api/templates/admin/misc/celery_monitor.html` |
+| React root / state | `ui/src/pages/index.tsx` |
+| API client (events) | `ui/src/api/events.ts` |
+| API client (topics) | `ui/src/api/topics.ts` |
+| API client (newsletter) | `ui/src/api/newsletter.ts` |
+| Topics panel | `ui/src/components/topics/TopicsPanel.tsx` |
+| Map component | `ui/src/components/events/MapView.tsx` |
+| Newsletter models | `api/newsletter/models.py` |
+| Newsletter generator | `api/services/newsletter/generator.py` |
+| Newsletter sender | `api/services/newsletter/sender.py` |
+| Waku pages | `ui/src/pages/` |
+| Docker services | `docker-compose.yml` |
+| Python deps | `api/requirements.txt` |
 
 ---
 
 ## Pipeline
 
 ```
-fetch_data (every 10m, timeout 30m)
+fetch_articles_task (every 10m, timeout 30m)
   └─ Telethon / HTTP → Article objects in MongoDB
 
-process_articles (every 10m, timeout 30m)
-  └─ spaCy NER + VADER sentiment + geopy → Article NLP fields
+process_articles_task (every 10m, timeout 30m)
+  └─ NER + VADER sentiment + geocoding → Article metadata fields (category, location, etc.)
 
-aggregate_events (every 10m, timeout 30m)
-  └─ Groups articles by (location, date) → Event objects in MongoDB
+aggregate_events_task (every 10m, timeout 30m)
+  └─ Bucket by (city, country, category, date)
+     → semantic sub-cluster via SemanticClusterer (cosine similarity ≥ 0.55)
+     → upsert Event objects in MongoDB keyed on (location_name, category, day)
+
+tag_topics_task (every 15m, timeout 30m)
+  └─ LLMTopicMatcher (batch, 10 events/call) → sets Event.topic_slugs for recent events
+     Falls back to TopicMatcher per-event on LLM error
+
+refresh_topics_task (daily 04:00, timeout 30m)
+  └─ WikipediaOngoingConflictsAdapter + WikipediaCurrentSituationsAdapter
+     → deduplicate_topics → semantic_merge_topics (threshold=0.85)
+     → _enrich_topics (LLM: descriptions + expanded keywords, batch 30)
+     → upsert Topic objects; mark stale topics is_current=False
+
+generate_newsletter_task (daily 06:00, timeout 30m)
+  └─ LLM-based newsletter draft → DailyNewsletter.body (Markdown)
 ```
 
-All three stages run on RQ queues via scheduler. Each job has a 30-minute hard timeout — if it hasn't finished by then, the worker kills it and the next cycle starts fresh.
+All tasks run on Celery workers (Redis broker). Each has a 30-minute hard time limit.
 
-| Job | Interval | Timeout |
-|-----|----------|---------|
-| fetch_data | 10m | 30m |
-| process_articles | 10m | 30m |
-| aggregate_events | 10m | 30m |
+| Task | Interval | Timeout |
+|------|----------|---------|
+| fetch_articles_task | 10m | 30m |
+| process_articles_task | 10m | 30m |
+| aggregate_events_task | 10m | 30m |
+| tag_topics_task | 15m | 30m |
+| refresh_topics_task | daily 04:00 | 30m |
+| fetch_prices_task | 5m | 30m |
+| fetch_notams_task | 15m | 30m |
+| fetch_earthquakes_task | 5m | 30m |
+| fetch_forex_task | 15m | 30m |
+| run_forecast_task | 60m | 30m |
+| score_forecasts_task | 60m | 30m |
+| generate_newsletter_task | daily 06:00 | 30m |
+
+---
+
+## Docker Services
+
+| Service | Command | Port |
+|---------|---------|------|
+| `api` | `uvicorn app.asgi:application` | 8000 (internal) |
+| `worker` | `celery -A app worker` | — |
+| `beat` | `celery -A app beat` | — |
+| `flower` | `celery -A app flower` | 5555 |
+| `frontend` | build → copy dist | — |
+| `nginx` | reverse proxy | 80, 443 |
+| `redis` | broker + cache | — |
+| `mongo` | database | 27017 |
 
 ---
 
@@ -307,14 +491,24 @@ All three stages run on RQ queues via scheduler. Each job has a 30-minute hard t
 | `SECRET_KEY` | — | Django secret key (required) |
 | `DATABASE_URL` | `mongodb://root:1234@localhost:27017/radar-live?authSource=admin` | MongoDB URI |
 | `DATABASE_NAME` | `radar-live` | MongoDB database name |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis URI |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis URI (Celery broker + result backend + cache) |
 | `DOMAIN` | `localhost` | Public hostname for nginx + Let's Encrypt |
 | `ENV_NAME` | `development` | Shown in X-App-Version header |
-| `TASK_QUEUE_ENABLED` | `false` | Enable RQ task enqueueing |
-| `WORKER_COUNT` | `4` | Number of RQ worker processes |
-| `FETCH_INTERVAL_MINUTES` | `10` | How often to fetch new articles |
-| `PROCESS_INTERVAL_MINUTES` | `10` | How often to run NLP pipeline |
-| `AGGREGATE_INTERVAL_MINUTES` | `10` | How often to aggregate events |
+| `TASK_QUEUE_ENABLED` | `false` | If false, tasks run synchronously (`CELERY_TASK_ALWAYS_EAGER=True`) |
+| `WORKER_COUNT` | `4` | Celery worker concurrency |
+| `FETCH_INTERVAL_MINUTES` | `10` | fetch_articles_task period |
+| `PROCESS_INTERVAL_MINUTES` | `10` | process_articles_task period |
+| `AGGREGATE_INTERVAL_MINUTES` | `10` | aggregate_events_task period |
+| `TAG_TOPICS_INTERVAL_MINUTES` | `15` | tag_topics_task period |
+| `TOPICS_REFRESH_HOUR` | `4` | Hour (UTC) for daily refresh_topics_task |
+| `PRICE_FETCH_INTERVAL_MINUTES` | `5` | fetch_prices_task period |
+| `NOTAM_FETCH_INTERVAL_MINUTES` | `15` | fetch_notams_task period |
+| `EARTHQUAKE_FETCH_INTERVAL_MINUTES` | `5` | fetch_earthquakes_task period |
+| `FOREX_FETCH_INTERVAL_MINUTES` | `15` | fetch_forex_task period |
+| `FORECAST_INTERVAL_MINUTES` | `60` | run_forecast_task period |
+| `FORECAST_SCORE_INTERVAL_MINUTES` | `60` | score_forecasts_task period |
+| `NEWSLETTER_GENERATE_HOUR` | `6` | Hour (UTC) for daily newsletter generation |
+| `JOB_TIMEOUT_SECONDS` | `1800` | Celery task time_limit (30m) |
 
 ---
 
@@ -322,21 +516,31 @@ All three stages run on RQ queues via scheduler. Each job has a 30-minute hard t
 
 - **MongoDB date filters**: never `__date=`, always explicit datetime range
 - **UUID filtering**: `article_ids` stores strings; convert with `uuid.UUID()` first
-- **`django.setup()`**: called once in `run_scheduler()` — never in job helpers or commands
-- **App names**: Django apps use simple names (`'core'`, `'accounts'`, `'api'`) — no `services.` prefix
+- **No RQ/django_rq**: removed entirely — do not add back; use `@shared_task` + `.delay()`
+- **`CELERY_TASK_ALWAYS_EAGER`**: set to `not TASK_QUEUE_ENABLED` — tasks run synchronously in dev when queue is disabled. This means `.delay()` is safe to call regardless of env.
+- **Celery app name**: the app is named `"app"` (matching the Django package) — `celery -A app worker` resolves correctly with `PYTHONPATH=/app`
+- **Beat schedule is static**: no `django-celery-beat` DB backend — all schedules are in `settings/base.py`. To change an interval, edit the setting or env var and restart `beat`.
+- **App names**: Django apps use simple names (`'core'`, `'accounts'`, `'api'`, `'newsletter'`) — no path prefix
 - **Model imports**: use `from core import models as core_models` — never bare `import core.models`
-- **services/ imports**: `from services.cleaning import ...`, `from services.location import ...` — these are plain Python modules, not Django apps
+- **services/ imports**: plain Python modules — e.g. `from services.processing.clustering import get_clusterer`
+- **CeleryMonitor**: unmanaged model in `misc` app — never run `makemigrations` for it, never query it
 - **DRF**: all API responses must go through serializers — no hand-built dicts in views
-- **Migrations**: all centralized in `backend/migrations/`; mapped via `MIGRATION_MODULES` in settings
+- **Migrations**: all centralized in `api/migrations/`; mapped via `MIGRATION_MODULES` in settings
 - **Built-in migrations**: `auth`, `admin`, `contenttypes` migrations are custom MongoDB-compatible files — do not regenerate with `makemigrations`
 - **DATABASE_URL goes in HOST**: `django-mongodb-backend` reads the connection string from `DATABASES['default']['HOST']`, not `DATABASE_URL`
 - **Frontend proxy**: in dev, Vite proxies `/api` → `localhost:8000`; in prod, nginx does it
-- **nginx HTTPS**: run `./init-letsencrypt.sh` once before `docker compose up` in production
-- **decouple .env**: `python-decouple` searches from CWD — place `.env` in project root or `cd backend` before running manage.py locally
-- **ArticleDatum `total=False`**: only `banner_image_url` is optional; the required fields (`source_url`, `title`, `content`, etc.) are enforced by the base TypedDict `_ArticleDatumRequired` — do not flatten back to a single `total=False` dict
+- **nginx HTTPS**: run `./nginx/init-letsencrypt.sh` once before `docker compose up` in production
+- **decouple .env**: `python-decouple` searches from CWD — place `.env` in project root or `cd api` before running manage.py locally
+- **ArticleDatum `total=False`**: only `banner_image_url` is optional; required fields enforced by `_ArticleDatumRequired` base TypedDict — do not flatten to a single `total=False` dict
 - **Newsletter body is Markdown**: stored as raw Markdown in `DailyNewsletter.body`; converted to HTML at send time — do not store HTML
-- **Email `<h2>` styling**: done via regex replace in `sender.py` (inline styles) not in the template — email clients strip `<style>` blocks inconsistently
+- **Email `<h2>` styling**: done via regex replace in `sender.py` (inline styles) — email clients strip `<style>` blocks inconsistently
 - **Newsletter date URL**: `/newsletter/YYYY/MM/DD` falls back to latest published newsletter on 404 — treat the date as a soft hint, not a hard key
+- **Semantic clustering threshold**: default 0.55 cosine similarity. Lower = more aggressive merging; higher = more splits. Do not change without testing.
+- **Frontend TypeScript only**: all UI files are `.tsx`/`.ts` — never create `.jsx`/`.js`
+- **Topic sources**: single source `WikipediaCurrentEventsAdapter` using `Portal:Current_events` date subpages. `TOPIC_SOURCES_DAYS` env var sets the lookback window (default: `30`). Old sources (`wikipedia-ongoing-conflicts`, `wikipedia-current-situations`, `gdelt-conflicts`) are removed — do not reference them.
+- **`tag_events_with_topics` uses LLM**: `LLMTopicMatcher` sends batches of 10 events per LLM call; `retroactive_tag_topic` still uses the fast keyword-based `TopicMatcher`.
+- **`refresh_topics` runs LLM enrichment**: `Workflow._enrich_topics()` calls the LLM after scraping to generate proper descriptions and expand keywords (batches of 30). Falls back silently — topics are upserted with raw scraped metadata if LLM is unavailable.
+- **LLM responses: always strip code fences**: use `re.sub(r'^```(?:json)?\s*', '', r)` + `re.sub(r'\s*```$', '', r)` before `json.loads()`. All LLM-calling code in the project does this — do not omit it in new code.
 
 ---
 
@@ -346,8 +550,8 @@ All three stages run on RQ queues via scheduler. Each job has a 30-minute hard t
 # Start everything
 docker compose up
 
-# Run from project root (decouple reads .env from CWD)
-cd backend
+# Run from api/ directory (decouple reads .env from CWD)
+cd api
 
 # Run migrations
 python manage.py migrate
@@ -355,34 +559,70 @@ python manage.py migrate
 # Create superuser
 python manage.py createsuperuser
 
-# Manually fetch messages for a source (last N hours) — runs in foreground
-python manage.py fetch_data <source_code> --hours 6
+# Pipeline commands — all support inline (default) and --background (Celery queue) modes.
+# Without --background: task runs directly in this process (no Celery required).
+# With    --background: task is enqueued to Celery; if TASK_QUEUE_ENABLED=False it
+#                       still runs synchronously via CELERY_TASK_ALWAYS_EAGER.
 
-# Enqueue fetch as a background RQ job (returns immediately)
+# Fetch articles for a source (last N hours)
+python manage.py fetch_data <source_code> --hours 6
 python manage.py fetch_data <source_code> --hours 6 --background
 
-# Run NLP pipeline (foreground or background)
+# Run NLP pipeline
 python manage.py process_articles --limit 500
 python manage.py process_articles --limit 500 --background
 
-# Aggregate processed articles into events (foreground or background)
+# Aggregate processed articles into events
 python manage.py aggregate_events --hours 24
 python manage.py aggregate_events --hours 24 --background
 
-# Generate newsletter for a date (foreground)
+# Tag events with topics
+python manage.py tag_topics --hours 24
+python manage.py tag_topics --hours 24 --background
+
+# Retroactively tag events for a single topic
+python manage.py retroactive_tag_topic <slug>
+python manage.py retroactive_tag_topic <slug> --background
+
+# Refresh topics list
+python manage.py refresh_topics
+python manage.py refresh_topics --background
+
+# Generate newsletter for a date
 python manage.py generate_newsletter --date 2025-03-08
 
-# Send newsletter for a date (foreground)
+# Send newsletter for a date
 python manage.py send_newsletter --date 2025-03-08
 
-# Run worker locally
-python worker.py
+# Run the full pipeline end-to-end and write a JSON report for manual inspection
+python manage.py e2e_pipeline                              # default: 6h fetch, 24h window, 5 samples
+python manage.py e2e_pipeline --source <code> --fetch-hours 12 --hours 48
+python manage.py e2e_pipeline --skip-fetch --skip-process  # aggregate + tag only
+python manage.py e2e_pipeline --samples 10 --output /tmp/report.json
+# Report written to ./e2e_report_<timestamp>.json — contains per-step counts,
+# ok/error flags, and sample article/event/topic snapshots at each stage.
+
+# Run Celery worker locally
+celery -A app worker --loglevel=info
+
+# Run Celery Beat locally
+celery -A app beat --loglevel=info
+
+# Inspect running Celery tasks
+celery -A app inspect active
+celery -A app inspect reserved
+
+# Open Flower UI (when running via Docker)
+# http://localhost:5555
+
+# Django admin Celery monitor
+# http://localhost:8000/admin/ → "Celery Monitor"
 
 # Frontend dev server (port 5173, proxies /api to localhost:8000)
-cd frontend && npm run dev
+cd ui && npm run dev
 
 # Build frontend
-cd frontend && npm run build
+cd ui && npm run build
 ```
 
 ---
@@ -393,9 +633,11 @@ Before shipping any backend change:
 - [ ] `python manage.py check` passes
 - [ ] `python manage.py migrate --check` (no unapplied migrations)
 - [ ] API endpoints return expected shape (test with curl or browser)
+- [ ] `python manage.py e2e_pipeline` completes without errors; inspect the JSON report to verify article → event → topic flow
 
 Before shipping any frontend change:
-- [ ] `npm run build` succeeds in `frontend/`
+- [ ] `npm run build` succeeds in `ui/`
 - [ ] Map renders markers correctly
 - [ ] Event list and cards expand/collapse without errors
-- [ ] Filters apply correctly to map and list
+- [ ] Filters (category, topic) apply correctly to map and list
+- [ ] Topic pills in `TopicsPanel` toggle `activeTopic` correctly

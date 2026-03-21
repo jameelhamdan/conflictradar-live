@@ -4,12 +4,14 @@ from api.views.events import (
     PriceLatestView, PriceHistoryView,
     NotamZoneListView, NotamHistoryView,
     EarthquakeListView, StaticPointListView,
+    TopicListView, TopicDetailView, TopicEventsView,
     SSEStreamView,
 )
 from api.views.newsletter import (
     SubscribeView, ConfirmView, UnsubscribeView,
     NewsletterListView, NewsletterLatestView, NewsletterDetailView,
 )
+from api.views.forecasts import ForecastListView, ForecastLatestView
 
 urlpatterns = [
     # ── Events & sources ──────────────────────────────────────────────────────
@@ -30,6 +32,15 @@ urlpatterns = [
 
     # ── Static reference points ───────────────────────────────────────────────
     path('static-points/', StaticPointListView.as_view(), name='static-point-list'),
+
+    # ── Current global topics ─────────────────────────────────────────────────
+    path('topics/', TopicListView.as_view(), name='topic-list'),
+    path('topics/<str:slug>/', TopicDetailView.as_view(), name='topic-detail'),
+    path('topics/<str:slug>/events/', TopicEventsView.as_view(), name='topic-events'),
+
+    # ── Forecasts ─────────────────────────────────────────────────────────────
+    path('forecasts/', ForecastListView.as_view(), name='forecast-list'),
+    path('forecasts/latest/', ForecastLatestView.as_view(), name='forecast-latest'),
 
     # ── Server-Sent Events ────────────────────────────────────────────────────
     path('sse/', SSEStreamView.as_view(), name='sse-stream'),

@@ -21,10 +21,12 @@ def _redis_cache():
     return caches['redis-cache']
 
 from core import models as core_models
+from rest_framework import generics, status as drf_status
 from api.serializers import (
     ArticleSerializer, EventSerializer, SourceSerializer,
     PriceTickSerializer, NotamZoneSerializer, NotamRecordSerializer,
     EarthquakeRecordSerializer, StaticPointSerializer,
+    TopicSerializer,
 )
 
 
@@ -60,6 +62,9 @@ class EventListView(APIView):
 
         if category := request.query_params.get('category'):
             qs = qs.filter(category=category)
+
+        if topic_slug := request.query_params.get('topic'):
+            qs = qs.filter(topic_slugs=topic_slug)
 
         if start := request.query_params.get('start'):
             try:
@@ -260,6 +265,138 @@ class StaticPointListView(APIView):
 
         serializer = StaticPointSerializer(qs, many=True)
         return Response({'results': serializer.data, 'count': len(serializer.data)})
+
+
+class TopicListView(APIView):
+    """
+    GET /api/topics/
+
+    Query params:
+      active    true (default) | false | all
+      current   true | false | all — filter by is_current flag
+      category  EventCategory slug
+      date      YYYY-MM-DD — topics active on that date
+      parent    parent topic slug — returns sub-topics of that topic
+      source    source_id string — topics confirmed by a specific adapter
+      month     1-12 — historical topics for that calendar month
+      year      integer — historical topics for that year
+    """
+
+    def get(self, request):
+        from django.db.models import Q
+        qs = core_models.Topic.objects.all()
+
+        # active filter (default: only active)
+        active_param = request.query_params.get('active', 'true').lower()
+        if active_param == 'true':
+            qs = qs.filter(is_active=True)
+        elif active_param == 'false':
+            qs = qs.filter(is_active=False)
+
+        # is_current filter
+        current_param = request.query_params.get('current', '').lower()
+        if current_param == 'true':
+            qs = qs.filter(is_current=True)
+        elif current_param == 'false':
+            qs = qs.filter(is_current=False)
+
+        # is_top_level filter
+        top_level_param = request.query_params.get('top_level', '').lower()
+        if top_level_param == 'true':
+            qs = qs.filter(is_top_level=True)
+        elif top_level_param == 'false':
+            qs = qs.filter(is_top_level=False)
+
+        if category := request.query_params.get('category'):
+            qs = qs.filter(category=category)
+
+        if parent := request.query_params.get('parent'):
+            qs = qs.filter(parent_slug=parent)
+
+        # Temporal date filter
+        if date_str := request.query_params.get('date'):
+            try:
+                from datetime import timezone as dt_tz
+                dt = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=dt_tz.utc)
+                qs = qs.filter(
+                    Q(started_at__lte=dt) | Q(started_at__isnull=True)
+                ).filter(
+                    Q(ended_at__gte=dt) | Q(ended_at__isnull=True)
+                )
+            except ValueError:
+                return Response(
+                    {'error': 'Invalid date format. Use YYYY-MM-DD.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Historical calendar filters
+        if month_str := request.query_params.get('month'):
+            try:
+                qs = qs.filter(historical_month=int(month_str))
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid month. Use 1-12.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if year_str := request.query_params.get('year'):
+            try:
+                qs = qs.filter(historical_year=int(year_str))
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid year.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        topics = list(qs)
+
+        # source filter — applied in Python (JSONField list contains check)
+        if source_id := request.query_params.get('source'):
+            topics = [t for t in topics if source_id in (t.source_ids or [])]
+
+        data = {'results': TopicSerializer(topics, many=True).data}
+        data['count'] = len(data['results'])
+        return Response(data)
+
+
+class TopicDetailView(APIView):
+    """GET /api/topics/<slug>/"""
+
+    def get(self, request, slug):
+        try:
+            topic = core_models.Topic.objects.get(slug=slug)
+        except core_models.Topic.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(TopicSerializer(topic).data)
+
+
+class TopicEventsView(APIView):
+    """
+    GET /api/topics/<slug>/events/
+
+    Query params: start, end, limit (max 200, default 50)
+    """
+
+    def get(self, request, slug):
+        if not core_models.Topic.objects.filter(slug=slug).exists():
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        qs = core_models.Event.objects.filter(topic_slugs=slug)
+
+        if start := request.query_params.get('start'):
+            try:
+                qs = qs.filter(started_at__gte=_parse_dt(start))
+            except ValueError:
+                return Response({'error': 'Invalid start date'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if end := request.query_params.get('end'):
+            try:
+                qs = qs.filter(started_at__lte=_parse_dt(end))
+            except ValueError:
+                return Response({'error': 'Invalid end date'}, status=status.HTTP_400_BAD_REQUEST)
+
+        limit = _parse_int(request.query_params.get('limit'), 50, 200)
+        source_map = {s.code: s.name for s in core_models.Source.objects.only('code', 'name')}
+        data = {
+            'topic': slug,
+            'results': EventSerializer(qs[:limit], many=True, context={'source_map': source_map}).data,
+        }
+        data['count'] = len(data['results'])
+        return Response(data)
 
 
 class SSEStreamView(View):

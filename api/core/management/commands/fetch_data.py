@@ -21,11 +21,11 @@ class Command(BaseTaskCommand):
         )
         parser.add_argument(
             '--background', action='store_true',
-            help='Enqueue as a background RQ job instead of running directly',
+            help='Enqueue as a background Celery task instead of running directly',
         )
 
     def handle(self, *args, **kwargs):
-        from services.tasks import fetch_articles_job
+        from services.tasks import fetch_articles_task
 
         source_code = kwargs['source_code']
         if kwargs['hours'] is not None:
@@ -38,9 +38,9 @@ class Command(BaseTaskCommand):
         label = source_code or 'all sources'
 
         if kwargs['background']:
-            fetch_articles_job.delay(source_code, start_date)
-            self.stdout.write(self.style.SUCCESS('Enqueued fetch_articles_job'))
+            fetch_articles_task.delay(source_code, start_date)
+            self.stdout.write(self.style.SUCCESS('Enqueued fetch_articles_task'))
             return
 
-        count = fetch_articles_job(source_code, start_date)
+        count = fetch_articles_task(source_code, start_date)
         self.stdout.write(self.style.SUCCESS(f'Fetched {count} new article(s) from {label}'))

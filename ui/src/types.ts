@@ -7,6 +7,29 @@ export type Category =
   | "crime"
   | "general"
 
+export interface Topic {
+  id: string
+  slug: string
+  name: string
+  keywords: string[]
+  description?: string
+  category?: string
+  source_url?: string
+  is_current: boolean
+  is_active: boolean
+  is_pinned?: boolean
+  is_top_level?: boolean
+  started_at?: string
+  ended_at?: string
+  event_count: number
+  topic_score?: number
+}
+
+export interface TopicsResponse {
+  results: Topic[]
+  count: number
+}
+
 export interface EventSummary {
   id: string
   latitude: number | null
@@ -22,6 +45,8 @@ export interface EventSummary {
   source_codes: string[]
   source_names: string[]
   started_at: string
+  topics?: Record<string, number>
+  topic_slugs?: string[]
 }
 
 export interface Article {
@@ -43,6 +68,7 @@ export interface EventFilters {
   end?: string
   limit?: number
   bbox?: string
+  topic?: string
 }
 
 export interface EventsResponse {
@@ -150,6 +176,29 @@ export interface NewsletterDetail extends NewsletterSummary {
   text_body: string
   generated_at: string
   sent_count: number
+}
+
+export type ForecastDirection = "up" | "down" | "neutral"
+
+export interface Forecast {
+  id: string
+  symbol: string
+  stream_key: string
+  generated_at: string
+  horizon_hours: number
+  direction: ForecastDirection
+  confidence: number
+  predicted_value: number | null
+  actual_value: number | null
+  model_name: string
+  reasoning: string
+  event_ids: string[]
+  feature_vector: Record<string, unknown>
+}
+
+export interface ForecastsResponse {
+  results: Forecast[]
+  count: number
 }
 
 export type SSEEvent =

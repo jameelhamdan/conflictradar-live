@@ -12,6 +12,7 @@ export async function fetchEvents(
   if (filters.end) params.set("end", filters.end)
   if (filters.limit) params.set("limit", String(filters.limit))
   if (filters.bbox) params.set("bbox", filters.bbox)
+  if (filters.topic) params.set("topic", filters.topic)
 
   const res = await fetch(`${BASE}/events/?${params}`)
   if (!res.ok) throw new Error(`API error ${res.status}`)

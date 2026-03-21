@@ -2,6 +2,16 @@ from django.db import models
 from django_mongodb_backend.managers import MongoManager
 
 
+class CeleryMonitor(models.Model):
+    """Unmanaged proxy used solely to mount a live Celery inspect page in admin."""
+
+    class Meta:
+        managed = False
+        app_label = 'misc'
+        verbose_name = 'Celery Monitor'
+        verbose_name_plural = 'Celery Monitor'
+
+
 class EmailLog(models.Model):
     TYPE_CONFIRMATION = 'confirmation'
     TYPE_NEWSLETTER = 'newsletter'

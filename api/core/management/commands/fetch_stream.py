@@ -15,26 +15,26 @@ class Command(BaseTaskCommand):
         parser.add_argument(
             '--background',
             action='store_true',
-            help='Enqueue as a background RQ job instead of running directly',
+            help='Enqueue as a background Celery task instead of running directly',
         )
 
     def handle(self, *args, **kwargs):
         from services.streams import run_stream
         from services.tasks import (
-            fetch_forex_job,
-            fetch_prices_job,
-            fetch_notams_job,
-            fetch_earthquakes_job,
+            fetch_forex_task,
+            fetch_prices_task,
+            fetch_notams_task,
+            fetch_earthquakes_task,
         )
 
         stream = kwargs['stream']
 
         if kwargs['background']:
             job_map = {
-                'forex':       fetch_forex_job,
-                'prices':      fetch_prices_job,
-                'notam':       fetch_notams_job,
-                'earthquakes': fetch_earthquakes_job,
+                'forex':       fetch_forex_task,
+                'prices':      fetch_prices_task,
+                'notam':       fetch_notams_task,
+                'earthquakes': fetch_earthquakes_task,
             }
             self.enqueue(job_map[stream])
             return

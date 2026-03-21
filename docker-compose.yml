@@ -59,9 +59,7 @@ services:
     container_name: worker
     build: ./api
     restart: always
-    command: python ./worker.py
-    expose:
-      - "8001"
+    command: sh -c "celery -A app worker --loglevel=info --concurrency=$${WORKER_COUNT:-4}"
     depends_on:
       - mongo
       - redis
@@ -69,17 +67,28 @@ services:
     volumes:
       - ./media_data:/app/media
 
-  scheduler:
-    container_name: scheduler
+  beat:
+    container_name: beat
     build: ./api
     restart: always
-    command: python ./scheduler.py
+    command: python -m celery -A app beat --loglevel=info
     depends_on:
       - mongo
       - redis
     env_file: .env.app
     volumes:
       - ./media_data:/app/media
+
+  flower:
+    container_name: flower
+    build: ./api
+    restart: always
+    command: python -m celery -A app flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    env_file: .env.app
 
   redis:
     container_name: redis

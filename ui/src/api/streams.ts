@@ -3,6 +3,7 @@ import type {
   NotamZonesResponse,
   EarthquakesResponse,
   StaticPointsResponse,
+  ForecastsResponse,
   StreamKey,
   StaticPointType,
 } from "@/types"
@@ -49,6 +50,18 @@ export async function fetchStaticPoints(
   const params = new URLSearchParams()
   if (type) params.set("type", type)
   const res = await fetch(`${BASE_URL}/static-points/?${params}`)
+  if (!res.ok) throw new Error(`API error ${res.status}`)
+  return res.json()
+}
+
+export async function fetchForecasts(
+  symbol?: string,
+  stream_key?: string
+): Promise<ForecastsResponse> {
+  const params = new URLSearchParams()
+  if (symbol) params.set("symbol", symbol)
+  if (stream_key) params.set("stream_key", stream_key)
+  const res = await fetch(`${BASE_URL}/forecasts/latest/?${params}`)
   if (!res.ok) throw new Error(`API error ${res.status}`)
   return res.json()
 }

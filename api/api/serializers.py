@@ -2,6 +2,7 @@ from rest_framework import serializers
 from core.models import (
     Article, Event, Source,
     PriceTick, NotamRecord, NotamZone, EarthquakeRecord, StaticPoint,
+    Topic, Forecast,
 )
 from newsletter.models import DailyNewsletter
 
@@ -62,6 +63,8 @@ class EventSerializer(serializers.ModelSerializer):
             'avg_intensity',
             'source_codes',
             'source_names',
+            'topics',
+            'topic_slugs',
         ]
 
 
@@ -145,6 +148,33 @@ class NewsletterDetailSerializer(serializers.ModelSerializer):
             'id', 'date', 'subject', 'body',
             'articles', 'cover_image_url', 'cover_image_credit',
             'generated_at', 'sent_at', 'sent_count', 'event_count', 'status',
+        ]
+
+
+class TopicSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Topic
+        fields = [
+            'id', 'slug', 'name', 'keywords', 'description', 'category',
+            'source_url', 'source_ids', 'parent_slug',
+            'is_current', 'is_active', 'is_pinned', 'is_top_level',
+            'started_at', 'ended_at', 'fetched_at',
+            'historical_month', 'historical_day', 'historical_year',
+            'event_count', 'topic_score',
+        ]
+
+
+class ForecastSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Forecast
+        fields = [
+            'id', 'symbol', 'stream_key', 'generated_at', 'horizon_hours',
+            'direction', 'confidence', 'predicted_value', 'actual_value',
+            'model_name', 'reasoning', 'event_ids', 'feature_vector',
         ]
 
 

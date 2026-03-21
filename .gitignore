@@ -152,3 +152,4 @@ mongo/*
 media_data/*
 .static
 plans/*
+.claude/settings.local.json

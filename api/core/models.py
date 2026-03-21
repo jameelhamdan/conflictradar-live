@@ -169,6 +169,13 @@ class Event(models.Model):
     #  "ar": {"title": "...", "location_name": "..."}}
     translations = models.JSONField(default=dict, blank=True)
 
+    # Current global topics this event is connected to.
+    # Format: {slug: confidence_score} e.g. {"ukraine-war": 0.92}
+    topics = models.JSONField(default=dict, blank=True)
+
+    # Flat slug list for queryable filtering (parallel to topics dict)
+    topic_slugs = models.JSONField(default=list, blank=True)
+
     updated_on = models.DateTimeField(auto_now=True)
     created_on = models.DateTimeField(auto_now_add=True)
 
@@ -293,6 +300,88 @@ class EarthquakeRecord(models.Model):
         return f'M{self.magnitude} {self.location_name} {self.occurred_at:%Y-%m-%d}'
 
 
+class Topic(models.Model):
+    """
+    A news topic — either currently active (is_current=True) or historical
+    (is_current=False, populated from Wikipedia "On This Day" or aged-off current topics).
+
+    Events are tagged with matching topics via the tag_events_with_topics workflow.
+    """
+    slug        = models.CharField(max_length=128, unique=True)
+    name        = models.CharField(max_length=255)
+    keywords    = models.JSONField(default=list, blank=True)
+    description = models.TextField(blank=True)
+    category    = models.CharField(
+        max_length=64,
+        choices=EventCategory.choices,
+        blank=True,
+    )
+    source_url  = models.URLField(max_length=512, blank=True)
+
+    # Multi-source tracking — which adapters have confirmed this topic
+    source_ids  = models.JSONField(default=list, blank=True)
+
+    # is_current=True  → actively in today's news cycle (from Portal:Current_events)
+    # is_current=False → historical topic (from "On This Day" or deactivated current topic)
+    is_current  = models.BooleanField(default=True)
+
+    # is_active → operational flag; False means suppressed/soft-deleted
+    is_active   = models.BooleanField(default=True)
+
+    # Lifecycle (current topics)
+    started_at  = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When this topic first appeared in the news',
+    )
+    ended_at    = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When this topic resolved or faded. Null means still ongoing.',
+    )
+    fetched_at  = models.DateTimeField(auto_now=True)
+
+    # Topic hierarchy — optional parent topic slug
+    parent_slug = models.CharField(max_length=128, null=True, blank=True)
+
+    # Calendar anchor for historical topics (from "On This Day")
+    historical_month = models.IntegerField(null=True, blank=True)  # 1-12
+    historical_day   = models.IntegerField(null=True, blank=True)  # 1-31
+    historical_year  = models.IntegerField(null=True, blank=True)  # e.g. 1989
+
+    # Denormalized count of events tagged with this topic (updated by tag_topics_task)
+    event_count = models.IntegerField(default=0)
+
+    # Scoring and top-level promotion (updated by tag_topics_task)
+    topic_score  = models.FloatField(default=0.0, help_text='Composite ranking score, updated by tag_topics_task.')
+    is_pinned    = models.BooleanField(default=False, help_text='Admin override: always shown in header, never auto-demoted.')
+    is_top_level = models.BooleanField(default=False, help_text='Auto-set: shown in UI header when score passes threshold.')
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['is_current']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['is_top_level']),
+            models.Index(fields=['category']),
+            models.Index(fields=['started_at']),
+            models.Index(fields=['ended_at']),
+            models.Index(fields=['parent_slug']),
+            models.Index(fields=['historical_month', 'historical_day']),
+        ]
+
+    def is_live_at(self, dt) -> bool:
+        """Return True if this topic was active at the given datetime."""
+        if self.started_at and self.started_at > dt:
+            return False
+        if self.ended_at and self.ended_at < dt:
+            return False
+        return True
+
+    def __str__(self):
+        return self.name
+
+
 class StaticPointType(models.TextChoices):
     EXCHANGE           = 'exchange',           _('Stock Exchange')
     COMMODITY_EXCHANGE = 'commodity_exchange', _('Commodity Exchange')
@@ -357,3 +446,40 @@ class ArticleFeatures:
     sub_category: str | None  # LLM-assigned sub-category slug within category
     llm_data: dict          # raw LLM response — stored in article.extra_data['llm']
     translations: dict      # i18n subdocument — stored in article.translations
+
+
+class ForecastDirection(models.TextChoices):
+    UP      = 'up',      _('Up')
+    DOWN    = 'down',    _('Down')
+    NEUTRAL = 'neutral', _('Neutral')
+
+
+class Forecast(models.Model):
+    """LLM-generated directional market forecast for a given asset."""
+    symbol          = models.CharField(max_length=32)
+    stream_key      = models.CharField(max_length=32)
+    generated_at    = models.DateTimeField()
+    horizon_hours   = models.IntegerField(default=4)
+    direction       = models.CharField(max_length=16, choices=ForecastDirection.choices)
+    confidence      = models.FloatField()
+    predicted_value = models.FloatField(null=True, blank=True)
+    actual_value    = models.FloatField(null=True, blank=True)
+    model_name      = models.CharField(max_length=128)
+    reasoning       = models.TextField(blank=True)
+    event_ids       = models.JSONField(default=list)
+    feature_vector  = models.JSONField(default=dict)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-generated_at']
+        indexes = [
+            models.Index(fields=['symbol', 'generated_at']),
+            models.Index(fields=['stream_key']),
+            models.Index(fields=['generated_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.symbol} {self.direction} @ {self.generated_at:%Y-%m-%d %H:%M}'
+
+

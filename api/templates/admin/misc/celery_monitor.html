@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Celery Monitor{% endblock %}
+
+{% block content %}
+<style>
+  .celery-table { width:100%; border-collapse:collapse; margin-bottom:2em }
+  .celery-table th { background:#f0f0f0; padding:6px 10px; text-align:left; border:1px solid #ddd }
+  .celery-table td { padding:6px 10px; border:1px solid #ddd; vertical-align:top }
+  .mono { font-family:monospace; font-size:0.85em }
+  .muted { color:#888; font-size:0.85em }
+  .section-count { font-size:0.8em; font-weight:normal; color:#666 }
+</style>
+
+<h1>Celery Monitor</h1>
+
+{# ── Active ───────────────────────────────────────────────────── #}
+<h2>▶ Active <span class="section-count">({{ active|length }} running)</span></h2>
+{% if active %}
+<table class="celery-table">
+  <thead><tr>
+    <th>Task</th><th>ID</th><th>Args / kwargs</th><th>Worker</th>
+  </tr></thead>
+  <tbody>
+    {% for t in active %}
+    <tr>
+      <td class="mono">{{ t.name }}</td>
+      <td class="mono muted">{{ t.id }}</td>
+      <td class="muted">{{ t.args }} {{ t.kwargs }}</td>
+      <td class="muted">{{ t.hostname|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No tasks currently running.</p>
+{% endif %}
+
+{# ── Reserved ─────────────────────────────────────────────────── #}
+<h2>⏳ Reserved <span class="section-count">({{ reserved|length }} picked up, waiting)</span></h2>
+{% if reserved %}
+<table class="celery-table">
+  <thead><tr>
+    <th>Task</th><th>ID</th><th>Args / kwargs</th><th>Worker</th>
+  </tr></thead>
+  <tbody>
+    {% for t in reserved %}
+    <tr>
+      <td class="mono">{{ t.name }}</td>
+      <td class="mono muted">{{ t.id }}</td>
+      <td class="muted">{{ t.args }} {{ t.kwargs }}</td>
+      <td class="muted">{{ t.hostname|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No reserved tasks.</p>
+{% endif %}
+
+{# ── Scheduled ────────────────────────────────────────────────── #}
+<h2>🕐 Scheduled <span class="section-count">({{ scheduled|length }} with ETA/countdown)</span></h2>
+{% if scheduled %}
+<table class="celery-table">
+  <thead><tr>
+    <th>Task</th><th>ID</th><th>ETA</th><th>Worker</th>
+  </tr></thead>
+  <tbody>
+    {% for t in scheduled %}
+    <tr>
+      <td class="mono">{{ t.request.name|default:t.name|default:"—" }}</td>
+      <td class="mono muted">{{ t.request.id|default:t.id|default:"—" }}</td>
+      <td class="muted">{{ t.eta|default:"—" }}</td>
+      <td class="muted">{{ t.request.hostname|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No scheduled tasks.</p>
+{% endif %}
+
+<p class="muted" style="margin-top:2em">
+  Live data from Celery workers via inspect API (2 s timeout). Refresh to update.<br>
+  For full history, graphs and queues see
+  <a href="http://localhost:5555" target="_blank">Flower at :5555</a>.
+</p>
+{% endblock %}

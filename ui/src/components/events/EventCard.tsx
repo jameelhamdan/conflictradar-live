@@ -14,9 +14,11 @@ interface EventCardProps {
   event: EventSummary
   selected: boolean
   onSelect: (id: string) => void
+  onTopicClick?: (slug: string) => void
+  activeTopic?: string | null
 }
 
-export default function EventCard({ event, selected, onSelect }: EventCardProps) {
+export default function EventCard({ event, selected, onSelect, onTopicClick, activeTopic }: EventCardProps) {
   const { lang, t } = useLanguage()
   const pick = useLocalizedField()
   const [articles, setArticles] = useState<Article[] | null>(null)
@@ -69,6 +71,33 @@ export default function EventCard({ event, selected, onSelect }: EventCardProps)
       <div className="mb-[0.4rem]">
         <EventMeta event={event} />
       </div>
+
+      {event.topic_slugs && event.topic_slugs.length > 0 && (
+        <div className="mb-[0.4rem] flex flex-wrap gap-[0.25rem]">
+          {event.topic_slugs.slice(0, 3).map((slug) => (
+            <button
+              key={slug}
+              onClick={(e) => {
+                e.stopPropagation()
+                onTopicClick?.(slug)
+              }}
+              className={cn(
+                "rounded-full border px-[0.45rem] py-[0.1rem] text-[0.68rem] leading-[1.4] transition-colors duration-100",
+                activeTopic === slug
+                  ? "border-[#7c9ef8] bg-[#1e2540] text-[#7c9ef8]"
+                  : "border-[#2a2a44] bg-[#1a1a2e] text-[#8888aa] hover:border-[#7c9ef8] hover:text-[#7c9ef8]",
+              )}
+            >
+              {slug}
+            </button>
+          ))}
+          {event.topic_slugs.length > 3 && (
+            <span className="rounded-full border border-[#2a2a44] px-[0.45rem] py-[0.1rem] text-[0.68rem] leading-[1.4] text-[#666677]">
+              +{event.topic_slugs.length - 3}
+            </span>
+          )}
+        </div>
+      )}
 
       <Button
         onClick={toggleArticles}

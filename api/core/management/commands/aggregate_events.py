@@ -15,20 +15,20 @@ class Command(BaseTaskCommand):
         )
         parser.add_argument(
             '--background', action='store_true',
-            help='Enqueue as a background RQ job instead of running directly',
+            help='Enqueue as a background Celery task instead of running directly',
         )
 
     def handle(self, *args, **kwargs):
-        from services.tasks import aggregate_events_job
+        from services.tasks import aggregate_events_task
 
         task_kwargs = dict(hours=kwargs['hours'], min_articles=kwargs['min_articles'])
 
         if kwargs['background']:
-            aggregate_events_job.delay(**task_kwargs)
-            self.stdout.write(self.style.SUCCESS('Enqueued aggregate_events_job'))
+            aggregate_events_task.delay(**task_kwargs)
+            self.stdout.write(self.style.SUCCESS('Enqueued aggregate_events_task'))
             return
 
-        created, updated = aggregate_events_job(**task_kwargs)
+        created, updated = aggregate_events_task(**task_kwargs)
         self.stdout.write(self.style.SUCCESS(
             f'Aggregation complete: {created} created, {updated} updated'
         ))
