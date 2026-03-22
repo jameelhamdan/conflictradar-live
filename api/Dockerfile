@@ -10,11 +10,14 @@ RUN apt-get update && apt-get upgrade -y \
 ENV HF_HOME=/py/huggingface
 ENV UV_INDEX_STRATEGY=unsafe-best-match
 
+COPY ./init_models.py /init_models.py
+
 RUN pip install --no-cache-dir uv \
     && uv venv /py \
     && uv pip install --python /py/bin/python -r /requirements.txt \
-    && /py/bin/python -c "from transformers import pipeline; pipeline('token-classification', model='dslim/bert-base-NER', aggregation_strategy='simple')" \
-    && adduser --disabled-password djangouser
+    && /py/bin/python /init_models.py \
+    && adduser --disabled-password djangouser \
+    && chown -R djangouser /py/huggingface
 
 COPY . /app
 WORKDIR /app

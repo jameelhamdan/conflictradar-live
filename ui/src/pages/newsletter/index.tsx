@@ -37,13 +37,6 @@ export default function NewsletterPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-app-bg text-app-text-primary">
-      <title>Daily Briefing — conflictradar.live</title>
-      <meta
-        name="description"
-        content="Daily AI-written geopolitical briefing from conflictradar.live, summarising the most important global events."
-      />
-      <link rel="canonical" href="https://conflictradar.live/newsletter" />
-
       <SiteHeader activePage="newsletter" />
 
       <main className="flex flex-1 min-h-0 border-t border-app-border-mid">
