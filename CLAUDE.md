@@ -9,8 +9,8 @@ This file gives Claude everything needed to write correct, consistent code for t
 | Layer | Tech |
 |-------|------|
 | Backend | Django 6 + django-mongodb-backend |
-| Task queue | Celery + Redis (broker + result backend) |
-| Scheduling | Celery Beat (static `CELERY_BEAT_SCHEDULE` in settings) |
+| Task queue | django-rq + Redis |
+| Scheduling | rq-scheduler (`setup_schedule` management command) |
 | Storage | MongoDB 8 |
 | Ingestion | Telethon (Telegram) + requests |
 | NLP | sentence-transformers + VADER + geopy |
@@ -27,9 +27,9 @@ This file gives Claude everything needed to write correct, consistent code for t
 ```
 ./
 ├── api/                    # All Django/Python source (Docker build context: ./api, PYTHONPATH=/app)
-│   ├── app/                # WSGI/ASGI entry, Celery app, URLs, middleware, auth backend
-│   │   ├── __init__.py     # Imports celery_app so it loads with Django
-│   │   ├── celery.py       # Celery app init — app = Celery("app"); autodiscover_tasks()
+│   ├── app/                # WSGI/ASGI entry, URLs, middleware, auth backend
+│   │   ├── __init__.py     # Version string + build tag
+│   │   ├── celery.py       # Stub (Celery removed — queue is django-rq)
 │   │   ├── asgi.py         # ASGI application entry point
 │   │   ├── urls.py         # Root URLconf — admin/ + api/
 │   │   ├── backends.py     # ModelAuthBackend (respects user.can_login)
@@ -47,6 +47,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 │   │       ├── refresh_topics.py       # Enqueues refresh_topics_task
 │   │       ├── tag_topics.py           # Enqueues tag_topics_task
 │   │       ├── retroactive_tag_topic.py # Enqueues retroactive_tag_topic_task
+│   │       ├── setup_schedule.py       # Registers all periodic jobs with rq-scheduler
 │   │       └── e2e_pipeline.py         # End-to-end pipeline test → JSON report
 │   ├── accounts/           # Custom User model + Session + Group proxies
 │   │   ├── apps.py         # name='accounts', label='accounts'
@@ -63,7 +64,8 @@ This file gives Claude everything needed to write correct, consistent code for t
 │   │   ├── tasks.py        # generate_newsletter_task, send_newsletter_task
 │   │   └── management/commands/
 │   ├── services/           # Stateless Python services (no Django models)
-│   │   ├── tasks.py        # All Celery @shared_task entrypoints
+│   │   ├── tasks.py        # All task functions (plain Python — no decorator)
+│   │   ├── queue.py        # enqueue() helper — wraps django-rq; sync fallback in dev
 │   │   ├── workflow.py     # Workflow class — orchestrates pipeline steps
 │   │   ├── processing/     # NLP processing pipeline
 │   │   │   ├── analyzer.py     # Article analysis (NER, sentiment, geocoding)
@@ -101,11 +103,11 @@ This file gives Claude everything needed to write correct, consistent code for t
 │   │   ├── misc/
 │   │   └── newsletter/
 │   ├── settings/
-│   │   └── base.py         # All config — DB, cache, Celery, Beat schedule, auth, logging
+│   │   └── base.py         # All config — DB, cache, RQ_QUEUES, auth, logging
 │   ├── templates/
 │   │   ├── admin/core/
 │   │   └── admin/misc/
-│   │       └── celery_monitor.html  # Django admin Celery task viewer
+│   │       └── celery_monitor.html  # Django admin queue monitor (RQ workers/jobs)
 │   ├── manage.py           # Django CLI
 │   ├── requirements.txt
 │   ├── release.sh          # collectstatic + migrate (run by Docker on api startup)
@@ -135,7 +137,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 │   └── templates/
 │       └── default.conf.template  # nginx reverse proxy template (envsubst)
 ├── version.txt             # Application version string
-├── docker-compose.yml      # nginx, certbot, api, worker, beat, flower, frontend, mongo, redis
+├── docker-compose.yml      # nginx, certbot, api, worker, scheduler, frontend, mongo, redis
 └── CLAUDE.md               # ← you are here
 ```
 
@@ -184,69 +186,59 @@ This file gives Claude everything needed to write correct, consistent code for t
 
 ### Tasks / Background Jobs
 
-All Celery tasks live in `services/tasks.py` (pipeline + streams + topics + forecasting) and `newsletter/tasks.py`.
+All task functions live in `services/tasks.py` (pipeline + streams + topics + forecasting) and `newsletter/tasks.py`. They are **plain Python functions** — no decorator.
 
-- Decorator: `@shared_task(time_limit=JOB_TIMEOUT_SECONDS, max_retries=2, default_retry_delay=60)`
-- Enqueue: `my_task.delay(arg1, kwarg=val)` — never `queue.enqueue(...)`, never `django_rq`
+- Enqueue: `from services.queue import enqueue; enqueue(my_task, arg1, kwarg=val)`
 - Task names follow the `*_task` suffix convention
-- Management commands call task functions **directly** (not via `.delay()`) for inline/foreground execution; use `--background` to enqueue instead
+- Management commands call task functions **directly** for inline/foreground execution; use `--background` to enqueue instead
+- `enqueue()` calls the function synchronously when `TASK_QUEUE_ENABLED=False` (dev default)
 
 To add a new background task:
-1. Write the function in `services/tasks.py` with `@shared_task`
-2. Call it: `my_task.delay(...)`
-3. Add a schedule entry to `CELERY_BEAT_SCHEDULE` in `settings/base.py` if periodic
+1. Write the plain function in `services/tasks.py`
+2. Enqueue it: `from services.queue import enqueue; enqueue(my_task, ...)`
+3. Add it to `setup_schedule.py` if it should run periodically
 
-**Never use `django_rq`, `rq`, or `schedule` — those are removed.**
+### Scheduling (rq-scheduler)
 
-### Scheduling (Celery Beat)
+All periodic jobs are registered by the `setup_schedule` management command (`api/core/management/commands/setup_schedule.py`). The `scheduler` Docker service runs this command on startup then launches `rqscheduler`.
 
-All periodic jobs are defined in `CELERY_BEAT_SCHEDULE` in `api/settings/base.py`. The `beat` Docker service runs `celery -A app beat`. Schedule is static (no `django-celery-beat` DB backend).
+| Task | Default interval |
+|---|---|
+| `fetch_articles_task` | 10m |
+| `process_articles_task` | 10m |
+| `aggregate_events_task` | 10m |
+| `tag_topics_task` | 15m |
+| `refresh_topics_task` | daily at 04:00 UTC (cron) |
+| `fetch_prices_task` | 5m |
+| `fetch_notams_task` | 15m |
+| `fetch_earthquakes_task` | 5m |
+| `fetch_forex_task` | 15m |
+| `run_forecast_task` | 60m |
+| `score_forecasts_task` | 60m |
+| `generate_newsletter_task` | daily at 06:00 UTC (cron) |
+| `discover_topics_task` | 30m |
 
-| Beat key | Task | Default interval |
-|---|---|---|
-| `fetch-articles` | `services.tasks.fetch_articles_task` | 10m |
-| `process-articles` | `services.tasks.process_articles_task` | 10m |
-| `aggregate-events` | `services.tasks.aggregate_events_task` | 10m |
-| `tag-topics` | `services.tasks.tag_topics_task` | 15m |
-| `refresh-topics` | `services.tasks.refresh_topics_task` | daily at 04:00 |
-| `fetch-prices` | `services.tasks.fetch_prices_task` | 5m |
-| `fetch-notams` | `services.tasks.fetch_notams_task` | 15m |
-| `fetch-earthquakes` | `services.tasks.fetch_earthquakes_task` | 5m |
-| `fetch-forex` | `services.tasks.fetch_forex_task` | 15m |
-| `run-forecasts` | `services.tasks.run_forecast_task` | 60m |
-| `score-forecasts` | `services.tasks.score_forecasts_task` | 60m |
-| `generate-newsletter` | `newsletter.tasks.generate_newsletter_task` | daily at 06:00 |
-
-### Celery App Init
-
-`api/app/celery.py`:
-```python
-import os
-from celery import Celery
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings.base")
-app = Celery("app")
-app.config_from_object("django.conf:settings", namespace="CELERY")
-app.autodiscover_tasks()
-```
-
-`api/app/__init__.py` imports `celery_app` so it loads when Django starts:
-```python
-from .celery import app as celery_app
-__all__ = ("celery_app",)
-```
+To change an interval: update the env var and restart the `scheduler` service (it re-runs `setup_schedule` on startup, clearing and re-registering all jobs).
 
 ### Worker
 
-The Celery worker is started directly with the `celery` CLI — no wrapper script:
+The RQ worker is started via Django management command:
 
 ```bash
-celery -A app worker --loglevel=info --concurrency=4
+python manage.py rqworker default
 ```
 
-In Docker, the `worker` service uses `WORKER_COUNT` from the env file:
+In Docker the `worker` service runs this command directly.
+
+### Scheduler
+
+The `scheduler` Docker service runs `setup_schedule` then `rqscheduler`:
+
 ```
-command: sh -c "celery -A app worker --loglevel=info --concurrency=$${WORKER_COUNT:-4}"
+command: sh -c "python manage.py setup_schedule && rqscheduler --url $${REDIS_URL:-redis://redis:6379/0}"
 ```
+
+`setup_schedule` clears all existing scheduled jobs and re-registers them — idempotent, safe to re-run.
 
 ### Semantic Clustering
 
@@ -359,18 +351,13 @@ command: sh -c "celery -A app worker --loglevel=info --concurrency=$${WORKER_COU
 1. Create `api/core/management/commands/<name>.py`
 2. Subclass `BaseCommand`, implement `handle(self, *args, **options)`
 3. Import models as `from core import models as core_models`
-4. Call `my_task.delay(...)` for background execution (no `queue.enqueue`)
+4. Call `from services.queue import enqueue; enqueue(my_task, ...)` for background execution
 
 ### Add a new scheduled job
 
-In `api/settings/base.py` inside `CELERY_BEAT_SCHEDULE`:
-```python
-'my-job': {
-    'task': 'services.tasks.my_task',
-    'schedule': 600,  # seconds, or crontab(...)
-},
-```
-Define `my_task` in `services/tasks.py` with `@shared_task`.
+1. Write a plain function in `services/tasks.py`
+2. Add a `scheduler.schedule(...)` or `scheduler.cron(...)` call in `api/core/management/commands/setup_schedule.py`
+3. Restart the `scheduler` Docker service to apply
 
 ### Add a new React component
 
@@ -392,21 +379,21 @@ Define `my_task` in `services/tasks.py` with `@shared_task`.
 | Purpose | File |
 |---------|------|
 | Data models | `api/core/models.py` |
-| Celery app init | `api/app/celery.py` |
-| All Celery tasks | `api/services/tasks.py` |
+| All task functions | `api/services/tasks.py` |
+| Enqueue helper | `api/services/queue.py` → `enqueue()` |
+| Periodic schedule | `api/core/management/commands/setup_schedule.py` |
 | Pipeline orchestration | `api/services/workflow.py` |
 | Semantic clustering | `api/services/processing/clustering.py` |
 | Topic matching (keyword) | `api/services/topics/matcher.py` → `TopicMatcher` |
 | Topic matching (LLM batch) | `api/services/topics/matcher.py` → `LLMTopicMatcher` |
 | Topic source | `api/services/topics/sources/current_events.py` |
-| Beat schedule | `api/settings/base.py` → `CELERY_BEAT_SCHEDULE` |
 | API views | `api/api/views/` |
 | API serializers | `api/api/serializers.py` |
 | API URLs | `api/api/urls.py` |
 | Django settings | `api/settings/base.py` |
 | Root URLs | `api/app/urls.py` |
 | Mongo app configs | `api/apps.py` |
-| Celery admin template | `api/templates/admin/misc/celery_monitor.html` |
+| Queue monitor template | `api/templates/admin/misc/celery_monitor.html` |
 | React root / state | `ui/src/pages/index.tsx` |
 | API client (events) | `ui/src/api/events.ts` |
 | API client (topics) | `ui/src/api/topics.ts` |
@@ -450,7 +437,7 @@ generate_newsletter_task (daily 06:00, timeout 30m)
   └─ LLM-based newsletter draft → DailyNewsletter.body (Markdown)
 ```
 
-All tasks run on Celery workers (Redis broker). Each has a 30-minute hard time limit.
+All tasks run on RQ workers (Redis broker). Each has a 30-minute hard time limit (`JOB_TIMEOUT_SECONDS`).
 
 | Task | Interval | Timeout |
 |------|----------|---------|
@@ -474,9 +461,8 @@ All tasks run on Celery workers (Redis broker). Each has a 30-minute hard time l
 | Service | Command | Port |
 |---------|---------|------|
 | `api` | `uvicorn app.asgi:application` | 8000 (internal) |
-| `worker` | `celery -A app worker` | — |
-| `beat` | `celery -A app beat` | — |
-| `flower` | `celery -A app flower` | 5555 |
+| `worker` | `python manage.py rqworker default` | — |
+| `scheduler` | `setup_schedule && rqscheduler --url $REDIS_URL` | — |
 | `frontend` | build → copy dist | — |
 | `nginx` | reverse proxy | 80, 443 |
 | `redis` | broker + cache | — |
@@ -491,11 +477,10 @@ All tasks run on Celery workers (Redis broker). Each has a 30-minute hard time l
 | `SECRET_KEY` | — | Django secret key (required) |
 | `DATABASE_URL` | `mongodb://root:1234@localhost:27017/radar-live?authSource=admin` | MongoDB URI |
 | `DATABASE_NAME` | `radar-live` | MongoDB database name |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis URI (Celery broker + result backend + cache) |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis URI (RQ broker + cache) |
 | `DOMAIN` | `localhost` | Public hostname for nginx + Let's Encrypt |
 | `ENV_NAME` | `development` | Shown in X-App-Version header |
-| `TASK_QUEUE_ENABLED` | `false` | If false, tasks run synchronously (`CELERY_TASK_ALWAYS_EAGER=True`) |
-| `WORKER_COUNT` | `4` | Celery worker concurrency |
+| `TASK_QUEUE_ENABLED` | `false` | If false, `enqueue()` calls functions synchronously (no Redis needed) |
 | `FETCH_INTERVAL_MINUTES` | `10` | fetch_articles_task period |
 | `PROCESS_INTERVAL_MINUTES` | `10` | process_articles_task period |
 | `AGGREGATE_INTERVAL_MINUTES` | `10` | aggregate_events_task period |
@@ -508,7 +493,7 @@ All tasks run on Celery workers (Redis broker). Each has a 30-minute hard time l
 | `FORECAST_INTERVAL_MINUTES` | `60` | run_forecast_task period |
 | `FORECAST_SCORE_INTERVAL_MINUTES` | `60` | score_forecasts_task period |
 | `NEWSLETTER_GENERATE_HOUR` | `6` | Hour (UTC) for daily newsletter generation |
-| `JOB_TIMEOUT_SECONDS` | `1800` | Celery task time_limit (30m) |
+| `JOB_TIMEOUT_SECONDS` | `1800` | RQ job timeout (30m) — passed to `enqueue()` and `setup_schedule` |
 
 ---
 
@@ -516,14 +501,14 @@ All tasks run on Celery workers (Redis broker). Each has a 30-minute hard time l
 
 - **MongoDB date filters**: never `__date=`, always explicit datetime range
 - **UUID filtering**: `article_ids` stores strings; convert with `uuid.UUID()` first
-- **No RQ/django_rq**: removed entirely — do not add back; use `@shared_task` + `.delay()`
-- **`CELERY_TASK_ALWAYS_EAGER`**: set to `not TASK_QUEUE_ENABLED` — tasks run synchronously in dev when queue is disabled. This means `.delay()` is safe to call regardless of env.
-- **Celery app name**: the app is named `"app"` (matching the Django package) — `celery -A app worker` resolves correctly with `PYTHONPATH=/app`
-- **Beat schedule is static**: no `django-celery-beat` DB backend — all schedules are in `settings/base.py`. To change an interval, edit the setting or env var and restart `beat`.
+- **No Celery**: removed entirely — do not add back; use `services.queue.enqueue()` + plain functions
+- **`enqueue()` dev mode**: when `TASK_QUEUE_ENABLED=False`, `enqueue()` calls the function synchronously — no Redis or worker needed locally
+- **Schedule is stored in Redis**: `setup_schedule` clears and re-registers all jobs on every `scheduler` container start — this is intentional and idempotent
+- **Restart scheduler to change intervals**: edit the env var and restart the `scheduler` service; it re-runs `setup_schedule` automatically
 - **App names**: Django apps use simple names (`'core'`, `'accounts'`, `'api'`, `'newsletter'`) — no path prefix
 - **Model imports**: use `from core import models as core_models` — never bare `import core.models`
 - **services/ imports**: plain Python modules — e.g. `from services.processing.clustering import get_clusterer`
-- **CeleryMonitor**: unmanaged model in `misc` app — never run `makemigrations` for it, never query it
+- **QueueMonitor (CeleryMonitor model)**: unmanaged model in `misc` app — never run `makemigrations` for it, never query it; admin view uses django-rq + rq-scheduler inspect APIs
 - **DRF**: all API responses must go through serializers — no hand-built dicts in views
 - **Migrations**: all centralized in `api/migrations/`; mapped via `MIGRATION_MODULES` in settings
 - **Built-in migrations**: `auth`, `admin`, `contenttypes` migrations are custom MongoDB-compatible files — do not regenerate with `makemigrations`
@@ -559,10 +544,10 @@ python manage.py migrate
 # Create superuser
 python manage.py createsuperuser
 
-# Pipeline commands — all support inline (default) and --background (Celery queue) modes.
-# Without --background: task runs directly in this process (no Celery required).
-# With    --background: task is enqueued to Celery; if TASK_QUEUE_ENABLED=False it
-#                       still runs synchronously via CELERY_TASK_ALWAYS_EAGER.
+# Pipeline commands — all support inline (default) and --background (RQ queue) modes.
+# Without --background: task runs directly in this process (no Redis required).
+# With    --background: task is enqueued via django-rq; if TASK_QUEUE_ENABLED=False it
+#                       still runs synchronously (enqueue() calls the function directly).
 
 # Fetch articles for a source (last N hours)
 python manage.py fetch_data <source_code> --hours 6
@@ -602,21 +587,20 @@ python manage.py e2e_pipeline --samples 10 --output /tmp/report.json
 # Report written to ./e2e_report_<timestamp>.json — contains per-step counts,
 # ok/error flags, and sample article/event/topic snapshots at each stage.
 
-# Run Celery worker locally
-celery -A app worker --loglevel=info
+# Run RQ worker locally
+python manage.py rqworker default
 
-# Run Celery Beat locally
-celery -A app beat --loglevel=info
+# Register periodic schedule with rq-scheduler (run once, or on every scheduler start)
+python manage.py setup_schedule
 
-# Inspect running Celery tasks
-celery -A app inspect active
-celery -A app inspect reserved
+# Run rq-scheduler locally (after setup_schedule)
+rqscheduler --url redis://localhost:6379/0
 
-# Open Flower UI (when running via Docker)
-# http://localhost:5555
+# Inspect RQ queue stats
+python manage.py rqstats
 
-# Django admin Celery monitor
-# http://localhost:8000/admin/ → "Celery Monitor"
+# Django admin queue monitor
+# http://localhost:8000/admin/ → "Queue Monitor" (shows active workers, queued + scheduled jobs)
 
 # Frontend dev server (port 5173, proxies /api to localhost:8000)
 cd ui && npm run dev

@@ -2,11 +2,13 @@ import { useLanguage } from "../contexts/LanguageContext";
 import markdownContent from "@/assets/docs/md/terms.md?raw";
 import { PageLayout } from "../components/layout";
 import Markdown from "@/components/markdown";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const LAST_UPDATED = "2026-03-06";
 
 export default function TermsPage() {
   const { t } = useLanguage();
+  useDocumentTitle(t.termsPageTitle);
 
   return (
     <PageLayout activePage="terms">

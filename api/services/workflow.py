@@ -1,10 +1,7 @@
 """
-Background task functions for the pipeline.
+Pipeline workflow methods.
 
-Tasks are plain callables — enqueue them via Celery:
-    from services.tasks import fetch_articles_task
-    fetch_articles_task.delay(source_code=None, start_date=start_date)
-
+Tasks are plain callables — enqueue them via services.queue.enqueue().
 The management commands (fetch_data, process_articles, aggregate_events) are
 thin wrappers that parse CLI args and call or enqueue these functions.
 """
@@ -402,9 +399,10 @@ class Workflow:
             logger.info('[topics] Marked %d topic(s) as no longer current', len(stale_topics))
 
         if new_slugs:
+            from services.queue import enqueue
             from services.tasks import retroactive_tag_topic_task
             for slug in new_slugs:
-                retroactive_tag_topic_task.delay(slug=slug)
+                enqueue(retroactive_tag_topic_task, slug=slug)
                 logger.info('[topics] Enqueued retroactive tagging for: %s', slug)
 
         active_count = Topic.objects.filter(is_current=True, is_active=True).count()
@@ -696,6 +694,8 @@ class Workflow:
         """
         from core.models import Event, Topic, EventCategory
         from services.llm import get_llm_service
+        from services.queue import enqueue
+        from services.tasks import retroactive_tag_topic_task
 
         DISCOVERY_MIN_UNTAGGED = int(os.getenv('DISCOVERY_MIN_UNTAGGED_EVENTS', '3'))
         DISCOVERY_MAX_CLUSTERS = int(os.getenv('DISCOVERY_MAX_CLUSTERS', '5'))
@@ -788,7 +788,7 @@ class Workflow:
                 )
                 created_count += 1
                 logger.info('[discover] Created topic from events: %s (%s / %s)', slug, category, country)
-                retroactive_tag_topic_task.delay(slug=slug)
+                enqueue(retroactive_tag_topic_task, slug=slug)
 
             except Exception as exc:
                 logger.warning('[discover] LLM call failed for (%s, %s): %s', category, country, exc)

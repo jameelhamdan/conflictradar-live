@@ -6,9 +6,11 @@ import { useLanguage } from "../../contexts/LanguageContext"
 import type { NewsletterDetail } from "../../api/newsletter"
 import { SiteHeader } from "@/components/layout"
 import { NewsletterList, NewsletterView } from "@/components/newsletter"
+import { useDocumentTitle } from "../../hooks/useDocumentTitle"
 
 export default function NewsletterPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t.newsletter)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [latestData, setLatestData] = useState<NewsletterDetail | null>(null)
   const [isMobile, setIsMobile] = useState(false)

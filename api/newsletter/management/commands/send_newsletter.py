@@ -16,13 +16,14 @@ class Command(BaseCommand):
         parser.add_argument(
             '--background',
             action='store_true',
-            help='Enqueue as a background Celery task instead of running in the foreground.',
+            help='Enqueue as a background RQ task instead of running in the foreground.',
         )
 
     def handle(self, *args, **options):
         date_str = options.get('date')
         if options['background']:
-            send_newsletter_task.delay(date_str=date_str)
+            from services.queue import enqueue
+            enqueue(send_newsletter_task, date_str=date_str)
             self.stdout.write(self.style.SUCCESS(f'Enqueued newsletter sending for {date_str or "today"}.'))
         else:
             result = send_newsletter_task(date_str=date_str)

@@ -1,0 +1,70 @@
+"""Register all periodic jobs with rq-scheduler.
+
+Run once at scheduler startup (the scheduler Docker service does this before
+launching rqscheduler).  Clears any existing scheduled jobs first so
+re-running is idempotent.
+"""
+
+import os
+from datetime import datetime, timezone
+
+import django_rq
+from django.core.management.base import BaseCommand
+from rq_scheduler import Scheduler
+
+
+def _minutes(env_var: str, default: str) -> int:
+    return int(os.getenv(env_var, default)) * 60
+
+
+class Command(BaseCommand):
+    help = 'Register all periodic jobs with rq-scheduler (idempotent)'
+
+    def handle(self, *args, **options):
+        from newsletter.tasks import generate_newsletter_task
+        from services.tasks import (
+            aggregate_events_task,
+            discover_topics_task,
+            fetch_articles_task,
+            fetch_earthquakes_task,
+            fetch_forex_task,
+            fetch_notams_task,
+            fetch_prices_task,
+            process_articles_task,
+            refresh_topics_task,
+            run_forecast_task,
+            score_forecasts_task,
+            tag_topics_task,
+        )
+
+        conn = django_rq.get_connection('default')
+        scheduler = Scheduler(connection=conn)
+        timeout = int(os.getenv('JOB_TIMEOUT_SECONDS', '1800'))
+
+        # Clear existing scheduled jobs so re-runs are idempotent
+        for job in scheduler.get_jobs():
+            scheduler.cancel(job)
+        self.stdout.write('Cleared existing scheduled jobs.')
+
+        now = datetime.now(timezone.utc)
+
+        # ── Interval jobs ──────────────────────────────────────────────────────
+        scheduler.schedule(now, fetch_articles_task,   interval=_minutes('FETCH_INTERVAL_MINUTES', '10'),      repeat=None, timeout=timeout)
+        scheduler.schedule(now, process_articles_task, interval=_minutes('PROCESS_INTERVAL_MINUTES', '10'),    repeat=None, timeout=timeout)
+        scheduler.schedule(now, aggregate_events_task, interval=_minutes('AGGREGATE_INTERVAL_MINUTES', '10'),  repeat=None, timeout=timeout)
+        scheduler.schedule(now, tag_topics_task,       interval=_minutes('TAG_TOPICS_INTERVAL_MINUTES', '15'), repeat=None, timeout=timeout)
+        scheduler.schedule(now, discover_topics_task,  interval=_minutes('DISCOVER_TOPICS_INTERVAL_MINUTES', '30'), repeat=None, timeout=timeout)
+        scheduler.schedule(now, fetch_prices_task,     interval=_minutes('PRICE_FETCH_INTERVAL_MINUTES', '5'),      repeat=None, timeout=timeout)
+        scheduler.schedule(now, fetch_notams_task,     interval=_minutes('NOTAM_FETCH_INTERVAL_MINUTES', '15'),     repeat=None, timeout=timeout)
+        scheduler.schedule(now, fetch_earthquakes_task, interval=_minutes('EARTHQUAKE_FETCH_INTERVAL_MINUTES', '5'), repeat=None, timeout=timeout)
+        scheduler.schedule(now, fetch_forex_task,      interval=_minutes('FOREX_FETCH_INTERVAL_MINUTES', '15'),     repeat=None, timeout=timeout)
+        scheduler.schedule(now, run_forecast_task,     interval=_minutes('FORECAST_INTERVAL_MINUTES', '60'),        repeat=None, timeout=timeout)
+        scheduler.schedule(now, score_forecasts_task,  interval=_minutes('FORECAST_SCORE_INTERVAL_MINUTES', '60'),  repeat=None, timeout=timeout)
+
+        # ── Cron jobs ──────────────────────────────────────────────────────────
+        refresh_hour    = int(os.getenv('TOPICS_REFRESH_HOUR', '4'))
+        newsletter_hour = int(os.getenv('NEWSLETTER_GENERATE_HOUR', '6'))
+        scheduler.cron(f'0 {refresh_hour} * * *',    refresh_topics_task,    repeat=None, timeout=timeout)
+        scheduler.cron(f'0 {newsletter_hour} * * *', generate_newsletter_task, repeat=None, timeout=timeout)
+
+        self.stdout.write(self.style.SUCCESS('Schedule registered: 11 interval jobs + 2 cron jobs.'))

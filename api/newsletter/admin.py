@@ -15,9 +15,10 @@ class SubscriberAdmin(admin.ModelAdmin):
 def _generate(modeladmin, request, queryset):
     """Enqueue generate jobs for the selected dates."""
     from newsletter.tasks import generate_newsletter_task
+    from services.queue import enqueue
     for nl in queryset:
         try:
-            generate_newsletter_task.delay(str(nl.date))
+            enqueue(generate_newsletter_task, str(nl.date))
             modeladmin.message_user(request, f'Generate job enqueued for {nl.date}.', messages.SUCCESS)
         except Exception as exc:
             modeladmin.message_user(request, f'Failed to enqueue generate for {nl.date}: {exc}', messages.ERROR)
@@ -29,9 +30,10 @@ _generate.short_description = 'Enqueue generate for selected dates'
 def _send(modeladmin, request, queryset):
     """Enqueue send jobs for the selected dates."""
     from newsletter.tasks import send_newsletter_task
+    from services.queue import enqueue
     for nl in queryset:
         try:
-            send_newsletter_task.delay(str(nl.date))
+            enqueue(send_newsletter_task, str(nl.date))
             modeladmin.message_user(request, f'Send job enqueued for {nl.date}.', messages.SUCCESS)
         except Exception as exc:
             modeladmin.message_user(request, f'Failed to enqueue send for {nl.date}: {exc}', messages.ERROR)
@@ -43,11 +45,12 @@ _send.short_description = 'Enqueue send for selected dates'
 def _regenerate(modeladmin, request, queryset):
     """Delete selected newsletters then enqueue generate jobs for those dates."""
     from newsletter.tasks import generate_newsletter_task
+    from services.queue import enqueue
     dates = list(queryset.values_list('date', flat=True))
     queryset.delete()
     for date in dates:
         try:
-            generate_newsletter_task.delay(str(date))
+            enqueue(generate_newsletter_task, str(date))
             modeladmin.message_user(request, f'Deleted + generate job enqueued for {date}.', messages.SUCCESS)
         except Exception as exc:
             modeladmin.message_user(request, f'Deleted but failed to enqueue generate for {date}: {exc}', messages.ERROR)

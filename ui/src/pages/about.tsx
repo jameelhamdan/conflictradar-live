@@ -5,6 +5,7 @@ import { categoryColor } from "@/components/category";
 import { CATEGORY_LABEL } from "../i18n/categories";
 import { PageLayout, SiteLogo } from "../components/layout";
 import { Card } from "@/components/ui/card";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const CONTACT_EMAIL = "contact@conflictradar.live";
 
@@ -101,6 +102,8 @@ function AboutContent() {
 }
 
 export default function AboutPage() {
+  const { t } = useLanguage();
+  useDocumentTitle(t.about);
   return (
     <PageLayout activePage="about">
       <AboutContent />

@@ -15,7 +15,7 @@ class Command(BaseTaskCommand):
         )
         parser.add_argument(
             '--background', action='store_true',
-            help='Enqueue as a background Celery task instead of running directly',
+            help='Enqueue as a background RQ task instead of running directly',
         )
 
     def handle(self, *args, **kwargs):
@@ -24,7 +24,8 @@ class Command(BaseTaskCommand):
         task_kwargs = dict(hours=kwargs['hours'], force_retag=kwargs['force'])
 
         if kwargs['background']:
-            tag_topics_task.delay(**task_kwargs)
+            from services.queue import enqueue
+            enqueue(tag_topics_task, **task_kwargs)
             self.stdout.write(self.style.SUCCESS('Enqueued tag_topics_task'))
             return
 

@@ -7,12 +7,14 @@ import { fetchNewsletter, fetchLatestNewsletter } from "../../api/newsletter"
 import { useLanguage } from "../../contexts/LanguageContext"
 import type { NewsletterDetail } from "../../api/newsletter"
 import StatusDisplay from "@/components/StatusDisplay"
+import { useDocumentTitle } from "../../hooks/useDocumentTitle"
 
 export default function NewsletterDatePage() {
   const { t } = useLanguage()
   const [newsletter, setNewsletter] = useState<NewsletterDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  useDocumentTitle(newsletter?.subject ?? t.newsletter)
 
   useEffect(() => {
     const parts = window.location.pathname.replace(/\/$/, "").split("/").filter(Boolean)

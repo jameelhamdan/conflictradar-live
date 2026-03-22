@@ -5,7 +5,7 @@ from .models import CeleryMonitor, EmailLog
 
 @admin.register(CeleryMonitor)
 class CeleryMonitorAdmin(admin.ModelAdmin):
-    """Live Celery task inspector — no DB backing, uses the inspect API."""
+    """Live RQ queue inspector — no DB backing, uses the django-rq API."""
 
     def has_add_permission(self, request):
         return False
@@ -17,23 +17,54 @@ class CeleryMonitorAdmin(admin.ModelAdmin):
         return False
 
     def changelist_view(self, request, extra_context=None):
-        from celery import current_app
+        import django_rq
+        from rq import Queue
+        from rq.worker import Worker
 
-        inspect = current_app.control.inspect(timeout=2.0)
+        conn = django_rq.get_connection('default')
+        queue = Queue(connection=conn)
 
-        def flatten(mapping):
-            return [task for tasks in (mapping or {}).values() for task in tasks]
+        active = []
+        for worker in Worker.all(connection=conn):
+            job = worker.get_current_job()
+            if job:
+                active.append({
+                    'name': job.func_name,
+                    'id': job.id,
+                    'args': job.args,
+                    'kwargs': job.kwargs,
+                    'hostname': worker.name,
+                })
 
-        active    = flatten(inspect.active())
-        reserved  = flatten(inspect.reserved())
-        scheduled = flatten(inspect.scheduled())
+        queued = []
+        for job in queue.get_jobs():
+            queued.append({
+                'name': job.func_name,
+                'id': job.id,
+                'args': job.args,
+                'kwargs': job.kwargs,
+            })
+
+        try:
+            from rq_scheduler import Scheduler
+            scheduler = Scheduler(connection=conn)
+            scheduled = [
+                {
+                    'name': job.func_name,
+                    'id': job.id,
+                    'eta': job.meta.get('interval') or job.meta.get('cron_string') or '—',
+                }
+                for job in scheduler.get_jobs()
+            ]
+        except Exception:
+            scheduled = []
 
         context = {
             **self.admin_site.each_context(request),
-            "title": "Celery Monitor",
+            "title": "Queue Monitor",
             "opts": self.model._meta,
             "active": active,
-            "reserved": reserved,
+            "reserved": queued,
             "scheduled": scheduled,
         }
         return TemplateResponse(request, "admin/misc/celery_monitor.html", context)

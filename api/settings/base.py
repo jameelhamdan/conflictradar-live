@@ -3,7 +3,6 @@ import subprocess
 import sys
 from pathlib import Path
 import app
-from celery.schedules import crontab
 
 from decouple import config
 
@@ -58,6 +57,7 @@ INSTALLED_APPS = [
     'misc',
     'api',
     'services',
+    'django_rq',
 ]
 
 MIDDLEWARE = [
@@ -161,12 +161,12 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
-        'celery': {
+        'rq': {
             'handlers': ['api_handler'],
             'level': 'INFO',
             'propagate': False,
         },
-        'celery.task': {
+        'rq.worker': {
             'handlers': ['api_handler'],
             'level': 'INFO',
             'propagate': False,
@@ -234,85 +234,15 @@ OPENROUTER_MODELS = config('OPENROUTER_MODELS', default='openrouter/free')
 OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='')   # e.g. http://my-server:11434
 OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3')
 
-# ── Celery ────────────────────────────────────────────────────────────────────
+# ── RQ / django-rq ────────────────────────────────────────────────────────────
 _REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
-
-CELERY_BROKER_URL = _REDIS_URL
-CELERY_RESULT_BACKEND = _REDIS_URL
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TIMEZONE = 'UTC'
-CELERY_TASK_ALWAYS_EAGER = not TASK_QUEUE_ENABLED  # run synchronously when queue disabled
-CELERY_TASK_EAGER_PROPAGATES = True
-
 _JOB_TIMEOUT = int(config('JOB_TIMEOUT_SECONDS', default=1800))
 
-CELERY_BEAT_SCHEDULE = {
-    'fetch-articles': {
-        'task': 'services.tasks.fetch_articles_task',
-        'schedule': int(config('FETCH_INTERVAL_MINUTES', default=10)) * 60,
+RQ_QUEUES = {
+    'default': {
+        'URL': _REDIS_URL,
+        'DEFAULT_TIMEOUT': _JOB_TIMEOUT,
     },
-    'process-articles': {
-        'task': 'services.tasks.process_articles_task',
-        'schedule': int(config('PROCESS_INTERVAL_MINUTES', default=10)) * 60,
-    },
-    'aggregate-events': {
-        'task': 'services.tasks.aggregate_events_task',
-        'schedule': int(config('AGGREGATE_INTERVAL_MINUTES', default=10)) * 60,
-    },
-    'tag-topics': {
-        'task': 'services.tasks.tag_topics_task',
-        'schedule': int(config('TAG_TOPICS_INTERVAL_MINUTES', default=15)) * 60,
-    },
-    'refresh-topics': {
-        'task': 'services.tasks.refresh_topics_task',
-        'schedule': crontab(
-            hour=int(config('TOPICS_REFRESH_HOUR', default=4)),
-            minute=0,
-        ),
-    },
-    'fetch-prices': {
-        'task': 'services.tasks.fetch_prices_task',
-        'schedule': int(config('PRICE_FETCH_INTERVAL_MINUTES', default=5)) * 60,
-    },
-    'fetch-notams': {
-        'task': 'services.tasks.fetch_notams_task',
-        'schedule': int(config('NOTAM_FETCH_INTERVAL_MINUTES', default=15)) * 60,
-    },
-    'fetch-earthquakes': {
-        'task': 'services.tasks.fetch_earthquakes_task',
-        'schedule': int(config('EARTHQUAKE_FETCH_INTERVAL_MINUTES', default=5)) * 60,
-    },
-    'fetch-forex': {
-        'task': 'services.tasks.fetch_forex_task',
-        'schedule': int(config('FOREX_FETCH_INTERVAL_MINUTES', default=15)) * 60,
-    },
-    'run-forecasts': {
-        'task': 'services.tasks.run_forecast_task',
-        'schedule': int(config('FORECAST_INTERVAL_MINUTES', default=60)) * 60,
-    },
-    'score-forecasts': {
-        'task': 'services.tasks.score_forecasts_task',
-        'schedule': int(config('FORECAST_SCORE_INTERVAL_MINUTES', default=60)) * 60,
-    },
-    'generate-newsletter': {
-        'task': 'newsletter.tasks.generate_newsletter_task',
-        'schedule': crontab(
-            hour=int(config('NEWSLETTER_GENERATE_HOUR', default=6)),
-            minute=0,
-        ),
-    },
-    'discover-topics': {
-        'task': 'services.tasks.discover_topics_task',
-        'schedule': int(config('DISCOVER_TOPICS_INTERVAL_MINUTES', default=30)) * 60,
-    },
-    # TODO: enable after AWS SES is configured
-    # 'send-newsletter': {
-    #     'task': 'newsletter.tasks.send_newsletter_task',
-    #     'schedule': crontab(hour=int(config('NEWSLETTER_SEND_HOUR', default=7)), minute=0),
-    # },
 }
 
 # Email — provider selection: 'ses' (AWS SES) or 'smtp' (Django SMTP / console)

@@ -91,6 +91,7 @@ class ArticleAdmin(ImportExportModelAdmin):
 
     def _handle_pipeline_action(self, request):
         from django.utils.timezone import now
+        from services.queue import enqueue
         from services.tasks import aggregate_events_task, fetch_articles_task, process_articles_task
 
         action = request.POST["pipeline_action"]
@@ -99,17 +100,17 @@ class ArticleAdmin(ImportExportModelAdmin):
             hours = max(1, int(request.POST.get("fetch_hours") or 2))
             source_code = request.POST.get("fetch_source") or None
             start_date = now() - timedelta(hours=hours)
-            fetch_articles_task.delay(source_code, start_date)
+            enqueue(fetch_articles_task, source_code, start_date)
             self.message_user(request, f"Fetch job enqueued - {source_code}, last {hours}h.", messages.SUCCESS)
 
         if action in ("process", "run_all"):
             limit = max(1, int(request.POST.get("process_limit") or 500))
-            process_articles_task.delay(limit=limit)
+            enqueue(process_articles_task, limit=limit)
             self.message_user(request, f"Process job enqueued - limit {limit}.", messages.SUCCESS)
 
         if action in ("aggregate", "run_all"):
             hours = max(1, int(request.POST.get("aggregate_hours") or 24))
-            aggregate_events_task.delay(hours=hours)
+            enqueue(aggregate_events_task, hours=hours)
             self.message_user(request, f"Aggregate job enqueued - last {hours}h.", messages.SUCCESS)
 
         if action not in ("fetch", "process", "aggregate", "run_all"):
@@ -231,10 +232,11 @@ class TopicAdmin(admin.ModelAdmin):
 
     @admin.action(description="Retroactively tag events for selected topics")
     def retroactive_tag(self, request, queryset):
+        from services.queue import enqueue
         from services.tasks import retroactive_tag_topic_task
         count = 0
         for topic in queryset:
-            retroactive_tag_topic_task.delay(slug=topic.slug)
+            enqueue(retroactive_tag_topic_task, slug=topic.slug)
             count += 1
         self.message_user(request, f"Enqueued retroactive tagging for {count} topic(s).")
 
@@ -244,14 +246,15 @@ class TopicAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context=extra_context)
 
     def _handle_topic_action(self, request):
+        from services.queue import enqueue
         from services.tasks import refresh_topics_task, tag_topics_task
         action = request.POST["topic_action"]
         if action == "refresh":
-            refresh_topics_task.delay()
+            enqueue(refresh_topics_task)
             self.message_user(request, "Refresh topics job enqueued.", messages.SUCCESS)
         elif action == "tag":
             hours = max(1, int(request.POST.get("tag_hours") or 24))
-            tag_topics_task.delay(hours=hours)
+            enqueue(tag_topics_task, hours=hours)
             self.message_user(request, f"Tag topics job enqueued (last {hours}h).", messages.SUCCESS)
         return redirect(request.path)
 

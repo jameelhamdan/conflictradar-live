@@ -59,7 +59,7 @@ services:
     container_name: worker
     build: ./api
     restart: always
-    command: sh -c "celery -A app worker --loglevel=info --concurrency=$${WORKER_COUNT:-4}"
+    command: sh -c "python manage.py rqworker default"
     depends_on:
       - mongo
       - redis
@@ -67,28 +67,17 @@ services:
     volumes:
       - ./media_data:/app/media
 
-  beat:
-    container_name: beat
+  scheduler:
+    container_name: scheduler
     build: ./api
     restart: always
-    command: python -m celery -A app beat --loglevel=info
+    command: sh -c "python manage.py setup_schedule && rqscheduler --url $${REDIS_URL:-redis://redis:6379/0}"
     depends_on:
       - mongo
       - redis
     env_file: .env.app
     volumes:
       - ./media_data:/app/media
-
-  flower:
-    container_name: flower
-    build: ./api
-    restart: always
-    command: python -m celery -A app flower --port=5555
-    ports:
-      - "5555:5555"
-    depends_on:
-      - redis
-    env_file: .env.app
 
   redis:
     container_name: redis
