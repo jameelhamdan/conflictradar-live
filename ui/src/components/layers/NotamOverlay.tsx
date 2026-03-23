@@ -5,6 +5,7 @@ import { GeoJSON, Tooltip } from "react-leaflet";
 import type { PathOptions } from "leaflet";
 import { fetchNotamZones } from "../../api/streams";
 import type { NotamZone } from "../../types";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 const NOTAM_TYPE_COLOR: Record<string, string> = {
   tfr: "#ff4444",
@@ -36,6 +37,7 @@ interface NotamOverlayProps {
 }
 
 export default function NotamOverlay({ refresh }: NotamOverlayProps) {
+  const { t } = useLanguage();
   const [zones, setZones] = useState<NotamZone[]>([]);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function NotamOverlay({ refresh }: NotamOverlayProps) {
                 )}
                 {zone.effective_to && (
                   <div className="text-[0.68rem] text-muted-foreground/50">
-                    Until {new Date(zone.effective_to).toUTCString().slice(0, 22)}
+                    {t.notamUntil} {new Date(zone.effective_to).toUTCString().slice(0, 22)}
                   </div>
                 )}
               </div>

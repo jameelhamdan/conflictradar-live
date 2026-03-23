@@ -22,7 +22,7 @@ export default function NewsletterDatePage() {
     const date = year && month && day ? `${year}-${month}-${day}` : null
 
     if (!date) {
-      setError("Invalid date in URL.")
+      setError(t.invalidDateInUrl)
       setLoading(false)
       return
     }
@@ -30,7 +30,7 @@ export default function NewsletterDatePage() {
     fetchNewsletter(date)
       .catch(() => fetchLatestNewsletter())
       .then(setNewsletter)
-      .catch(() => setError("Could not load newsletter."))
+      .catch(() => setError(t.couldNotLoadNewsletter))
       .finally(() => setLoading(false))
   }, [])
 

@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useDocumentTitle } from "../../hooks/useDocumentTitle";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export default function UnsubscribePage() {
+  const { t } = useLanguage();
+  useDocumentTitle(t.unsubscribeTitle);
   const [status, setStatus] = useState<"loading" | "success" | "already" | "error">("loading");
   const [message, setMessage] = useState("");
 
@@ -10,7 +14,7 @@ export default function UnsubscribePage() {
     const token = window.location.pathname.split("/").filter(Boolean).pop();
     if (!token) {
       setStatus("error");
-      setMessage("Invalid unsubscribe link.");
+      setMessage(t.invalidUnsubscribeLink);
       return;
     }
     fetch(`/api/newsletter/unsubscribe/${token}/`)
@@ -26,12 +30,12 @@ export default function UnsubscribePage() {
           setMessage(msg);
         } else {
           setStatus("error");
-          setMessage(data.detail ?? "This link is invalid.");
+          setMessage(data.detail ?? t.invalidLink);
         }
       })
       .catch(() => {
         setStatus("error");
-        setMessage("Something went wrong. Please try again later.");
+        setMessage(t.somethingWentWrong);
       });
   }, []);
 
@@ -39,27 +43,25 @@ export default function UnsubscribePage() {
     <div className="min-h-screen bg-app-bg text-app-text-primary">
       <nav className="simple-page-nav">
         <a href="/" className="text-[0.82rem] font-medium text-app-text-muted no-underline">
-          ← Live map
+          {t.backToLiveMap}
         </a>
       </nav>
 
       <div className="simple-page-content">
         {status === "loading" && (
-          <p className="text-[0.95rem] text-app-text-muted">Processing…</p>
+          <p className="text-[0.95rem] text-app-text-muted">{t.processingUnsubscribe}</p>
         )}
         {(status === "success" || status === "already") && (
           <>
             <div className="mb-5 text-[2.5rem] leading-none">✓</div>
             <h1 className="mb-3 text-[1.4rem] font-bold tracking-[-0.01em] text-app-text-heading">
-              {status === "already" ? "Already unsubscribed" : "Unsubscribed"}
+              {status === "already" ? t.alreadyUnsubscribed : t.unsubscribed}
             </h1>
             <p className="mb-8 text-[0.92rem] leading-[1.65] text-app-text-secondary">
-              {status === "already"
-                ? "This email is not on our mailing list."
-                : "You've been removed from the daily briefing list. You won't receive any more emails from us."}
+              {status === "already" ? t.notOnMailingList : t.removedFromList}
             </p>
             <a href="/" className="simple-page-link-default">
-              Go to live map
+              {t.goToLiveMap}
             </a>
           </>
         )}
@@ -67,13 +69,13 @@ export default function UnsubscribePage() {
           <>
             <div className="mb-5 text-[2rem] leading-none text-app-accent-red">✕</div>
             <h1 className="mb-3 text-[1.4rem] font-bold tracking-[-0.01em] text-app-text-heading">
-              Invalid link
+              {t.invalidLink}
             </h1>
             <p className="mb-8 text-[0.92rem] leading-[1.65] text-app-text-secondary">
               {message}
             </p>
             <a href="/" className="simple-page-link-default">
-              Go to live map
+              {t.goToLiveMap}
             </a>
           </>
         )}

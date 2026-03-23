@@ -33,12 +33,6 @@ const POINT_TYPE_SYMBOL: Record<StaticPointType, string> = {
   port: "⚓",
   central_bank: "◉",
 }
-const POINT_TYPE_LABEL: Record<StaticPointType, string> = {
-  exchange: "Stock Exchange",
-  commodity_exchange: "Commodity Exchange",
-  port: "Major Port",
-  central_bank: "Central Bank",
-}
 
 function countryFlag(code: string): string {
   return code
@@ -62,10 +56,11 @@ function makeStaticIcon(type: StaticPointType): L.DivIcon {
 }
 
 function StaticPointCard({ point }: { point: StaticPoint }) {
+  const { t } = useLanguage()
   const type = point.point_type as StaticPointType
   const color = POINT_TYPE_COLOR[type]
   const symbol = POINT_TYPE_SYMBOL[type]
-  const label = POINT_TYPE_LABEL[type]
+  const label = t.pointTypeLabels[type] ?? type
   const flag = countryFlag(point.country_code)
   const m = point.metadata
   return (
@@ -110,20 +105,20 @@ function StaticPointCard({ point }: { point: StaticPoint }) {
         {(type === "exchange" || type === "central_bank") &&
           Boolean(m.timezone) && (
             <div className="flex justify-between gap-[12px] text-[0.7rem]">
-              <span className="text-app-text-secondary">Timezone</span>
+              <span className="text-app-text-secondary">{t.mapTimezone}</span>
               <span className="text-app-text-body-dim">{String(m.timezone)}</span>
             </div>
           )}
         {type === "central_bank" && Boolean(m.currency) && (
           <div className="flex justify-between gap-[12px] text-[0.7rem]">
-            <span className="text-app-text-secondary">Currency</span>
+            <span className="text-app-text-secondary">{t.mapCurrency}</span>
             <span className="text-app-text-body-dim">{String(m.currency)}</span>
           </div>
         )}
         {(type === "exchange" || type === "central_bank") &&
           Boolean(m.website) && (
             <div className="flex justify-between gap-[12px] text-[0.7rem]">
-              <span className="text-app-text-secondary">Website</span>
+              <span className="text-app-text-secondary">{t.mapWebsite}</span>
               <a
                 href={`https://${String(m.website)}`}
                 target="_blank"
@@ -138,7 +133,7 @@ function StaticPointCard({ point }: { point: StaticPoint }) {
         {type === "commodity_exchange" && Array.isArray(m.products) && (
           <div>
             <div className="mb-1 text-[0.68rem] text-app-text-secondary">
-              Products
+              {t.mapProducts}
             </div>
             <div className="flex flex-wrap gap-1">
               {(m.products as string[]).map((p) => (
@@ -161,15 +156,15 @@ function StaticPointCard({ point }: { point: StaticPoint }) {
           <>
             {Boolean(m.type) && (
               <div className="flex justify-between gap-[12px] text-[0.7rem]">
-                <span className="text-app-text-secondary">Port type</span>
+                <span className="text-app-text-secondary">{t.mapPortType}</span>
                 <span className="text-app-text-body-dim">{String(m.type)}</span>
               </div>
             )}
             {Boolean(m.teu_rank) && (
               <div className="flex justify-between gap-[12px] text-[0.7rem]">
-                <span className="text-app-text-secondary">TEU rank</span>
+                <span className="text-app-text-secondary">{t.mapTeuRankLabel}</span>
                 <span className="text-app-text-body-dim">
-                  {`#${String(m.teu_rank)} globally`}
+                  {t.mapTeuRank(m.teu_rank as string | number)}
                 </span>
               </div>
             )}
@@ -333,7 +328,7 @@ function ClusteredMarkers({
   const map = useMap()
   const [zoom, setZoom] = useState(() => map.getZoom())
   useMapEvents({ zoomend: () => setZoom(map.getZoom()) })
-  const { lang } = useLanguage()
+  const { lang, t } = useLanguage()
   const pick = useLocalizedField()
 
   const visibleStatic = showStaticPoints ? staticPoints : []
@@ -438,7 +433,7 @@ function ClusteredMarkers({
                       ([, a], [, b]) => b - a
                     )[0][0]
                   })()}{" "}
-                  · {cluster.events.length} events
+                  · {t.eventCount(cluster.events.length)}
                 </div>
                 {cluster.events.map((ev) => {
                   const color = categoryColor(ev.category)

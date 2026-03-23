@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { fetchForecasts } from "@/api/streams"
 import type { Forecast } from "@/types"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 const DIRECTION_ICON: Record<string, string> = {
   up:      "▲",
@@ -16,13 +17,6 @@ const DIRECTION_COLOR: Record<string, string> = {
   neutral: "#888899",
 }
 
-const STREAM_KEY_LABELS: Record<string, string> = {
-  commodity: "Commodities",
-  crypto:    "Crypto",
-  stock:     "Stocks",
-  forex:     "Forex",
-  bond:      "Bonds",
-}
 
 // Confidence bar — simple SVG strip
 function ConfidenceBar({ value }: { value: number }) {
@@ -72,7 +66,7 @@ function ForecastRow({ fc, selected, onClick }: ForecastRowProps) {
   )
 }
 
-function ReasoningPanel({ fc }: { fc: Forecast }) {
+function ReasoningPanel({ fc, t }: { fc: Forecast; t: ReturnType<typeof useLanguage>["t"] }) {
   const fv = fc.feature_vector as Record<string, unknown>
   const sentiment = typeof fv.news_sentiment_mean === "number"
     ? fv.news_sentiment_mean.toFixed(3)
@@ -103,7 +97,7 @@ function ReasoningPanel({ fc }: { fc: Forecast }) {
         {" · "}
         {fc.symbol}
         {" · "}
-        {fc.horizon_hours}h horizon
+        {t.forecastHorizon(fc.horizon_hours)}
         {" · "}
         <span style={{ color: "#444458" }}>{generated}</span>
       </div>
@@ -113,12 +107,12 @@ function ReasoningPanel({ fc }: { fc: Forecast }) {
         </div>
       )}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <span>Sentiment: <span style={{ color: "#e8e8f0" }}>{sentiment}</span></span>
-        <span>1h Δ: <span style={{ color: "#e8e8f0" }}>{momentum1h}</span></span>
-        <span>Related events: <span style={{ color: "#e8e8f0" }}>{routedCount}</span></span>
+        <span>{t.forecastSentiment} <span style={{ color: "#e8e8f0" }}>{sentiment}</span></span>
+        <span>{t.forecastMomentum1h} <span style={{ color: "#e8e8f0" }}>{momentum1h}</span></span>
+        <span>{t.forecastRelatedEvents} <span style={{ color: "#e8e8f0" }}>{routedCount}</span></span>
         {fc.actual_value !== null && (
           <span>
-            Actual: <span style={{ color: "#52c8a0" }}>{fc.actual_value?.toFixed(2)}</span>
+            {t.forecastActual} <span style={{ color: "#52c8a0" }}>{fc.actual_value?.toFixed(2)}</span>
           </span>
         )}
       </div>
@@ -127,6 +121,7 @@ function ReasoningPanel({ fc }: { fc: Forecast }) {
 }
 
 export default function ForecastPanel() {
+  const { t } = useLanguage()
   const [forecasts, setForecasts] = useState<Forecast[]>([])
   const [selected, setSelected]   = useState<string | null>(null)
   const [loading, setLoading]     = useState(true)
@@ -187,7 +182,7 @@ export default function ForecastPanel() {
         }}
       >
         <span>⬡</span>
-        <span style={{ flex: 1, textAlign: "left" }}>Market Forecasts</span>
+        <span style={{ flex: 1, textAlign: "left" }}>{t.marketForecasts}</span>
         <span>{expanded ? "▲" : "▼"}</span>
       </button>
 
@@ -205,7 +200,7 @@ export default function ForecastPanel() {
                   background:    "#0f0f13",
                 }}
               >
-                {STREAM_KEY_LABELS[key] ?? key}
+                {t.streamKeys[key as keyof typeof t.streamKeys] ?? key}
               </div>
               {fcs.map((fc) => (
                 <div key={fc.id}>
@@ -214,7 +209,7 @@ export default function ForecastPanel() {
                     selected={selected === fc.id}
                     onClick={() => setSelected((prev) => (prev === fc.id ? null : fc.id))}
                   />
-                  {selected === fc.id && <ReasoningPanel fc={fc} />}
+                  {selected === fc.id && <ReasoningPanel fc={fc} t={t} />}
                 </div>
               ))}
             </div>

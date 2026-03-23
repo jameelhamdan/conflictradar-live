@@ -69,6 +69,56 @@ export interface UIStrings {
     decline: string
     message: string
   }
+  // Controls / tooltips
+  hideSidebar: string
+  showSidebar: string
+  clearTimeFilter: string
+  clearTopicFilter: string
+  switchToArabic: string
+  switchToEnglish: string
+  noEventsFiltered: string
+  // Forecast panel
+  marketForecasts: string
+  forecastSentiment: string
+  forecastMomentum1h: string
+  forecastRelatedEvents: string
+  forecastActual: string
+  forecastHorizon: (n: number) => string
+  // Map — static point labels
+  pointTypeLabels: Record<string, string>
+  mapTimezone: string
+  mapCurrency: string
+  mapWebsite: string
+  mapProducts: string
+  mapPortType: string
+  mapTeuRankLabel: string
+  mapTeuRank: (rank: string | number) => string
+  // Map overlays
+  notamUntil: string
+  earthquakeTsunami: string
+  earthquakeDepth: string
+  // Newsletter
+  invalidDateInUrl: string
+  couldNotLoadNewsletter: string
+  // Confirm page
+  confirmSubscriptionTitle: string
+  confirmingSubscription: string
+  invalidConfirmLink: string
+  subscriptionConfirmed: string
+  youreSubscribed: string
+  confirmationFailed: string
+  goToLiveMap: string
+  backToLiveMap: string
+  somethingWentWrong: string
+  // Unsubscribe page
+  unsubscribeTitle: string
+  processingUnsubscribe: string
+  alreadyUnsubscribed: string
+  unsubscribed: string
+  notOnMailingList: string
+  removedFromList: string
+  invalidLink: string
+  invalidUnsubscribeLink: string
 }
 
 export const UI: Record<Language, UIStrings> = {
@@ -162,6 +212,54 @@ export const UI: Record<Language, UIStrings> = {
       message:
         "We use cookies to analyse site traffic via Google Analytics. No personal data is collected without your consent.",
     },
+    hideSidebar: "Hide sidebar",
+    showSidebar: "Show sidebar",
+    clearTimeFilter: "Clear time filter",
+    clearTopicFilter: "Clear topic filter",
+    switchToArabic: "Switch to Arabic",
+    switchToEnglish: "Switch to English",
+    noEventsFiltered: "No events match the current filters.",
+    marketForecasts: "Market Forecasts",
+    forecastSentiment: "Sentiment:",
+    forecastMomentum1h: "1h Δ:",
+    forecastRelatedEvents: "Related events:",
+    forecastActual: "Actual:",
+    forecastHorizon: (n) => `${n}h horizon`,
+    pointTypeLabels: {
+      exchange: "Stock Exchange",
+      commodity_exchange: "Commodity Exchange",
+      port: "Major Port",
+      central_bank: "Central Bank",
+    },
+    mapTimezone: "Timezone",
+    mapCurrency: "Currency",
+    mapWebsite: "Website",
+    mapProducts: "Products",
+    mapPortType: "Port type",
+    mapTeuRankLabel: "TEU rank",
+    mapTeuRank: (rank) => `#${rank} globally`,
+    notamUntil: "Until",
+    earthquakeTsunami: "TSUNAMI",
+    earthquakeDepth: "Depth:",
+    invalidDateInUrl: "Invalid date in URL.",
+    couldNotLoadNewsletter: "Could not load newsletter.",
+    confirmSubscriptionTitle: "Confirm subscription",
+    confirmingSubscription: "Confirming your subscription…",
+    invalidConfirmLink: "Invalid confirmation link.",
+    subscriptionConfirmed: "Subscription confirmed!",
+    youreSubscribed: "You're subscribed",
+    confirmationFailed: "Confirmation failed",
+    goToLiveMap: "Go to live map",
+    backToLiveMap: "← Live map",
+    somethingWentWrong: "Something went wrong. Please try again later.",
+    unsubscribeTitle: "Unsubscribe",
+    processingUnsubscribe: "Processing…",
+    alreadyUnsubscribed: "Already unsubscribed",
+    unsubscribed: "Unsubscribed",
+    notOnMailingList: "This email is not on our mailing list.",
+    removedFromList: "You've been removed from the daily briefing list. You won't receive any more emails from us.",
+    invalidLink: "Invalid link",
+    invalidUnsubscribeLink: "Invalid unsubscribe link.",
   },
   ar: {
     about: "حول",
@@ -254,5 +352,53 @@ export const UI: Record<Language, UIStrings> = {
       message:
         "نحن نستخدم الكوكيز لتحليل حركة الموقع عبر Google Analytics. لا يتم جمع أي بيانات شخصية دون موافقتك.",
     },
+    hideSidebar: "إخفاء الشريط الجانبي",
+    showSidebar: "إظهار الشريط الجانبي",
+    clearTimeFilter: "مسح فلتر الوقت",
+    clearTopicFilter: "مسح فلتر الموضوع",
+    switchToArabic: "Switch to Arabic",
+    switchToEnglish: "Switch to English",
+    noEventsFiltered: "لا توجد أحداث تطابق الفلاتر الحالية.",
+    marketForecasts: "توقعات الأسواق",
+    forecastSentiment: "المشاعر:",
+    forecastMomentum1h: "تغيير ١س:",
+    forecastRelatedEvents: "أحداث ذات صلة:",
+    forecastActual: "الفعلي:",
+    forecastHorizon: (n) => `أفق ${n} س`,
+    pointTypeLabels: {
+      exchange: "بورصة الأسهم",
+      commodity_exchange: "بورصة السلع",
+      port: "ميناء رئيسي",
+      central_bank: "بنك مركزي",
+    },
+    mapTimezone: "المنطقة الزمنية",
+    mapCurrency: "العملة",
+    mapWebsite: "الموقع",
+    mapProducts: "المنتجات",
+    mapPortType: "نوع الميناء",
+    mapTeuRankLabel: "ترتيب TEU",
+    mapTeuRank: (rank) => `عالمياً #${rank}`,
+    notamUntil: "حتى",
+    earthquakeTsunami: "تسونامي",
+    earthquakeDepth: "العمق:",
+    invalidDateInUrl: "تاريخ غير صحيح في الرابط.",
+    couldNotLoadNewsletter: "تعذّر تحميل النشرة.",
+    confirmSubscriptionTitle: "تأكيد الاشتراك",
+    confirmingSubscription: "جارٍ تأكيد اشتراكك…",
+    invalidConfirmLink: "رابط التأكيد غير صحيح.",
+    subscriptionConfirmed: "تم تأكيد الاشتراك!",
+    youreSubscribed: "أنت مشترك",
+    confirmationFailed: "فشل التأكيد",
+    goToLiveMap: "اذهب إلى الخريطة المباشرة",
+    backToLiveMap: "الخريطة المباشرة",
+    somethingWentWrong: "حدث خطأ ما. يرجى المحاولة لاحقاً.",
+    unsubscribeTitle: "إلغاء الاشتراك",
+    processingUnsubscribe: "جارٍ المعالجة…",
+    alreadyUnsubscribed: "ألغيت اشتراكك مسبقاً",
+    unsubscribed: "تم إلغاء الاشتراك",
+    notOnMailingList: "هذا البريد الإلكتروني غير مشترك في قائمتنا.",
+    removedFromList: "لقد تمت إزالتك من قائمة النشرات اليومية. لن تتلقى منا أي رسائل إلكترونية بعد الآن.",
+    invalidLink: "رابط غير صحيح",
+    invalidUnsubscribeLink: "رابط إلغاء الاشتراك غير صحيح.",
   },
 }

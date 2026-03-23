@@ -72,7 +72,7 @@ export function SiteHeader({ activePage, children, showNav = true }: SiteHeaderP
 
       <button
         onClick={() => setLang(lang === "en" ? "ar" : "en")}
-        title={lang === "en" ? "Switch to Arabic" : "Switch to English"}
+        title={lang === "en" ? t.switchToArabic : t.switchToEnglish}
         className="shrink-0 cursor-pointer rounded px-[0.45rem] py-[0.2rem] text-[0.8rem] font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         {lang === "en" ? "ع" : "EN"}

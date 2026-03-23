@@ -13,6 +13,7 @@ import { categoryLabel } from "../i18n/categories";
 import { fetchTopics } from "../api/topics";
 import type { EventSummary, EventFilters, Topic } from "../types";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const MapView = lazy(() => import("../components/events/MapView"));
 const POLL_INTERVAL_MS = 60_000;
@@ -45,6 +46,7 @@ type QuickFilter = (typeof QUICK_FILTERS)[number]["value"] | "";
 
 export default function IndexPage() {
   const { lang, t } = useLanguage();
+  useDocumentTitle();
 
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -170,7 +172,7 @@ export default function IndexPage() {
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+              title={sidebarOpen ? t.hideSidebar : t.showSidebar}
               className={cn(
                 "flex h-[1.6rem] w-[1.6rem] shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-[0.2rem] text-[1.2rem] transition-colors duration-[120ms]",
                 sidebarOpen ? "text-app-accent-blue" : "text-app-text-muted",
@@ -192,14 +194,14 @@ export default function IndexPage() {
                   }}
                   className={cn("qf-btn", active ? "qf-btn-active" : "qf-btn-inactive")}
                 >
-                  {qf.label}
+                  {({ "6h": t.filter6h, "24h": t.filter24h, "7d": t.filter7d, "30d": t.filter30d } as Record<string, string>)[qf.value] ?? qf.value}
                 </button>
               );
             })}
             {quickFilter && (
               <button
                 onClick={clearQuickFilter}
-                title="Clear time filter"
+                title={t.clearTimeFilter}
                 className="shrink-0 cursor-pointer rounded border-none bg-transparent px-[0.25rem] py-[0.1rem] text-[0.7rem] leading-none text-app-text-ghost"
               >
                 ✕
@@ -260,7 +262,7 @@ export default function IndexPage() {
             {activeTopic && (
               <button
                 onClick={() => setActiveTopic(null)}
-                title="Clear topic filter"
+                title={t.clearTopicFilter}
                 className="shrink-0 cursor-pointer rounded border-none bg-transparent px-[0.25rem] py-[0.1rem] text-[0.7rem] leading-none text-app-text-ghost"
               >
                 ✕

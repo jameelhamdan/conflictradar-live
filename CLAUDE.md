@@ -14,7 +14,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 | Storage | MongoDB 8 |
 | Ingestion | Telethon (Telegram) + requests |
 | NLP | sentence-transformers + VADER + geopy |
-| Frontend | React 19 + Waku + react-leaflet (TypeScript) |
+| Frontend | React 19 + Vite + react-router-dom + react-leaflet (TypeScript) |
 | Serving | uvicorn (backend) + nginx reverse proxy |
 | Containers | Docker Compose |
 
@@ -29,7 +29,6 @@ This file gives Claude everything needed to write correct, consistent code for t
 ├── api/                    # All Django/Python source (Docker build context: ./api, PYTHONPATH=/app)
 │   ├── app/                # WSGI/ASGI entry, URLs, middleware, auth backend
 │   │   ├── __init__.py     # Version string + build tag
-│   │   ├── celery.py       # Stub (Celery removed — queue is django-rq)
 │   │   ├── asgi.py         # ASGI application entry point
 │   │   ├── urls.py         # Root URLconf — admin/ + api/
 │   │   ├── backends.py     # ModelAuthBackend (respects user.can_login)
@@ -105,16 +104,15 @@ This file gives Claude everything needed to write correct, consistent code for t
 │   ├── settings/
 │   │   └── base.py         # All config — DB, cache, RQ_QUEUES, auth, logging
 │   ├── templates/
-│   │   ├── admin/core/
-│   │   └── admin/misc/
-│   │       └── celery_monitor.html  # Django admin queue monitor (RQ workers/jobs)
+│   │   └── admin/core/
 │   ├── manage.py           # Django CLI
 │   ├── requirements.txt
 │   ├── release.sh          # collectstatic + migrate (run by Docker on api startup)
 │   └── Dockerfile
-├── ui/                     # React 19 + Waku SPA (TypeScript)
+├── ui/                     # React 19 + Vite SPA (TypeScript, react-router-dom)
 │   ├── src/
-│   │   ├── pages/          # Waku file-based routes
+│   │   ├── main.tsx        # App entry — BrowserRouter + all Routes
+│   │   ├── pages/          # Page components (route targets)
 │   │   │   └── index.tsx   # Main map page — activeTopic state, TopicsPanel + EventList
 │   │   ├── api/            # Typed API client modules
 │   │   │   ├── events.ts   # fetchEvents(), fetchEventDetail()
@@ -147,7 +145,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 
 ### Django Apps
 
-- Django apps (`core`, `accounts`, `api`, `newsletter`) live directly under `api/` with simple names:
+- Django apps (`core`, `accounts`, `api`, `newsletter`, `misc`) live directly under `api/` with simple names:
   ```python
   name = 'core'
   label = 'core'
@@ -182,7 +180,7 @@ This file gives Claude everything needed to write correct, consistent code for t
 - `Article.banner_image_url` — nullable URLField; populated by RSS `media:content`/`media:thumbnail`/enclosure extraction at fetch time, or OG image scrape during `process_articles` (best-effort, HTTPS only)
 - `Event.started_at` is a DateTimeField — always timezone-aware (`django.utils.timezone.now()`)
 - `Event.topic_slugs` — list of matched topic slugs (tagged by `tag_topics_task`)
-- `CeleryMonitor` is an **unmanaged** model (`managed = False`) in the `misc` app — exists only as an admin registration hook, has no DB table
+- `misc` app contains only `EmailLog` model — admin panel for monitoring sent emails
 
 ### Tasks / Background Jobs
 
@@ -303,8 +301,8 @@ command: sh -c "python manage.py setup_schedule && rqscheduler --url $${REDIS_UR
 - All API calls go through typed modules in `src/api/` (`events.ts`, `newsletter.ts`, `streams.ts`, `topics.ts`)
 - React state lives in `src/pages/index.tsx`; pass down as props
 - Map markers use custom `L.divIcon` via category shape SVG; never plain `Marker` with default icon
-- Frontend uses **Waku** for file-based routing under `src/pages/`; static pages use `render: 'static'`, dynamic pages use `render: 'dynamic'`
-- Dynamic pages read route params from `window.location.pathname` (no Waku router hook needed)
+- Frontend uses **react-router-dom** `BrowserRouter` with routes defined in `src/main.tsx`
+- Route params available via `useParams()` from react-router-dom
 - All source files are TypeScript (`.tsx`/`.ts`) — not `.jsx`/`.js`
 - Dark theme color palette (inline styles):
   - Background: `#0f0f13`
@@ -393,7 +391,7 @@ command: sh -c "python manage.py setup_schedule && rqscheduler --url $${REDIS_UR
 | Django settings | `api/settings/base.py` |
 | Root URLs | `api/app/urls.py` |
 | Mongo app configs | `api/apps.py` |
-| Queue monitor template | `api/templates/admin/misc/celery_monitor.html` |
+| RQ admin panel | `/admin/django_rq/` (built-in django-rq panel) |
 | React root / state | `ui/src/pages/index.tsx` |
 | API client (events) | `ui/src/api/events.ts` |
 | API client (topics) | `ui/src/api/topics.ts` |
@@ -403,7 +401,7 @@ command: sh -c "python manage.py setup_schedule && rqscheduler --url $${REDIS_UR
 | Newsletter models | `api/newsletter/models.py` |
 | Newsletter generator | `api/services/newsletter/generator.py` |
 | Newsletter sender | `api/services/newsletter/sender.py` |
-| Waku pages | `ui/src/pages/` |
+| React pages | `ui/src/pages/` |
 | Docker services | `docker-compose.yml` |
 | Python deps | `api/requirements.txt` |
 
@@ -501,14 +499,13 @@ All tasks run on RQ workers (Redis broker). Each has a 30-minute hard time limit
 
 - **MongoDB date filters**: never `__date=`, always explicit datetime range
 - **UUID filtering**: `article_ids` stores strings; convert with `uuid.UUID()` first
-- **No Celery**: removed entirely — do not add back; use `services.queue.enqueue()` + plain functions
 - **`enqueue()` dev mode**: when `TASK_QUEUE_ENABLED=False`, `enqueue()` calls the function synchronously — no Redis or worker needed locally
 - **Schedule is stored in Redis**: `setup_schedule` clears and re-registers all jobs on every `scheduler` container start — this is intentional and idempotent
 - **Restart scheduler to change intervals**: edit the env var and restart the `scheduler` service; it re-runs `setup_schedule` automatically
-- **App names**: Django apps use simple names (`'core'`, `'accounts'`, `'api'`, `'newsletter'`) — no path prefix
+- **App names**: Django apps use simple names (`'core'`, `'accounts'`, `'api'`, `'newsletter'`, `'misc'`) — no path prefix
 - **Model imports**: use `from core import models as core_models` — never bare `import core.models`
 - **services/ imports**: plain Python modules — e.g. `from services.processing.clustering import get_clusterer`
-- **QueueMonitor (CeleryMonitor model)**: unmanaged model in `misc` app — never run `makemigrations` for it, never query it; admin view uses django-rq + rq-scheduler inspect APIs
+- **RQ admin**: use the built-in django-rq panel at `/admin/django-rq/` — no custom queue monitor views needed
 - **DRF**: all API responses must go through serializers — no hand-built dicts in views
 - **Migrations**: all centralized in `api/migrations/`; mapped via `MIGRATION_MODULES` in settings
 - **Built-in migrations**: `auth`, `admin`, `contenttypes` migrations are custom MongoDB-compatible files — do not regenerate with `makemigrations`
@@ -599,8 +596,8 @@ rqscheduler --url redis://localhost:6379/0
 # Inspect RQ queue stats
 python manage.py rqstats
 
-# Django admin queue monitor
-# http://localhost:8000/admin/ → "Queue Monitor" (shows active workers, queued + scheduled jobs)
+# RQ queue inspector (built into django-rq)
+# http://localhost:8000/admin/django-rq/
 
 # Frontend dev server (port 5173, proxies /api to localhost:8000)
 cd ui && npm run dev

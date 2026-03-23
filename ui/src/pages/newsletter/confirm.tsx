@@ -1,8 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useDocumentTitle } from "../../hooks/useDocumentTitle"
+import { useLanguage } from "../../contexts/LanguageContext"
 
 export default function ConfirmPage() {
+  const { t } = useLanguage()
+  useDocumentTitle(t.confirmSubscriptionTitle)
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
   const [message, setMessage] = useState("")
 
@@ -10,7 +14,7 @@ export default function ConfirmPage() {
     const token = window.location.pathname.split("/").filter(Boolean).pop()
     if (!token) {
       setStatus("error")
-      setMessage("Invalid confirmation link.")
+      setMessage(t.invalidConfirmLink)
       return
     }
     fetch(`/api/newsletter/confirm/${token}/`)
@@ -18,15 +22,15 @@ export default function ConfirmPage() {
         const data = await res.json()
         if (res.ok) {
           setStatus("success")
-          setMessage(data.detail ?? "Subscription confirmed!")
+          setMessage(data.detail ?? t.subscriptionConfirmed)
         } else {
           setStatus("error")
-          setMessage(data.detail ?? "This link is invalid or has already been used.")
+          setMessage(data.detail ?? t.invalidConfirmLink)
         }
       })
       .catch(() => {
         setStatus("error")
-        setMessage("Something went wrong. Please try again later.")
+        setMessage(t.somethingWentWrong)
       })
   }, [])
 
@@ -34,25 +38,25 @@ export default function ConfirmPage() {
     <div className="min-h-screen bg-app-bg text-app-text-primary">
       <nav className="simple-page-nav">
         <a href="/" className="text-[0.82rem] font-medium text-app-text-muted no-underline">
-          ← Live map
+          {t.backToLiveMap}
         </a>
       </nav>
 
       <div className="simple-page-content">
         {status === "loading" && (
-          <p className="text-[0.95rem] text-app-text-muted">Confirming your subscription…</p>
+          <p className="text-[0.95rem] text-app-text-muted">{t.confirmingSubscription}</p>
         )}
         {status === "success" && (
           <>
             <div className="mb-5 text-[2.5rem] leading-none">✓</div>
             <h1 className="mb-3 text-[1.4rem] font-bold tracking-[-0.01em] text-app-text-heading">
-              You're subscribed
+              {t.youreSubscribed}
             </h1>
             <p className="mb-8 text-[0.92rem] leading-[1.65] text-app-text-secondary">
               {message}
             </p>
             <a href="/" className="simple-page-link-primary">
-              Go to live map
+              {t.goToLiveMap}
             </a>
           </>
         )}
@@ -60,13 +64,13 @@ export default function ConfirmPage() {
           <>
             <div className="mb-5 text-[2rem] leading-none text-app-accent-red">✕</div>
             <h1 className="mb-3 text-[1.4rem] font-bold tracking-[-0.01em] text-app-text-heading">
-              Confirmation failed
+              {t.confirmationFailed}
             </h1>
             <p className="mb-8 text-[0.92rem] leading-[1.65] text-app-text-secondary">
               {message}
             </p>
             <a href="/" className="simple-page-link-default">
-              Go to live map
+              {t.goToLiveMap}
             </a>
           </>
         )}

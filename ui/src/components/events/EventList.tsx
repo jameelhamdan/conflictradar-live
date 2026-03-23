@@ -4,6 +4,7 @@ import { useRef, useEffect } from "react"
 import EventCard from "./EventCard"
 import StatusDisplay from "../StatusDisplay"
 import type { EventSummary } from "../../types"
+import { useLanguage } from "../../contexts/LanguageContext"
 
 interface EventListProps {
   events: EventSummary[]
@@ -14,6 +15,7 @@ interface EventListProps {
 }
 
 export default function EventList({ events, selectedId, onSelectEvent, onTopicClick, activeTopic }: EventListProps) {
+  const { t } = useLanguage()
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export default function EventList({ events, selectedId, onSelectEvent, onTopicCl
   }, [selectedId])
 
   if (events.length === 0) {
-    return <StatusDisplay status="empty" message="No events match the current filters." />
+    return <StatusDisplay status="empty" message={t.noEventsFiltered} />
   }
 
   return (
