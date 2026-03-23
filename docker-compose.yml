@@ -94,3 +94,7 @@ services:
     volumes:
       - ./mongo/data:/data/db
       - ./mongo/config:/data/configdb
+    deploy:
+      resources:
+        limits:
+          memory: 512m
