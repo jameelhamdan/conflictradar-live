@@ -66,6 +66,10 @@ services:
     env_file: .env.app
     volumes:
       - ./media_data:/app/media
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   scheduler:
     container_name: scheduler
