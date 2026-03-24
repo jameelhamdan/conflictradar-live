@@ -28,6 +28,7 @@ def _render_email(newsletter, date_str: str, base_url: str, unsubscribe_url: str
         'date_str': date_str,
         'base_url': base_url,
         'unsubscribe_url': unsubscribe_url,
+        'app_name': settings.APP_NAME,
     }
     html = render_to_string('newsletter/briefing.html', context)
     text = render_to_string('newsletter/briefing.txt', context)

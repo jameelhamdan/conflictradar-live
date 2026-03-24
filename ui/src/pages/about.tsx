@@ -6,8 +6,9 @@ import { CATEGORY_LABEL } from "../i18n/categories";
 import { PageLayout, SiteLogo } from "../components/layout";
 import { Card } from "@/components/ui/card";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import constants from "@/constants";
 
-const CONTACT_EMAIL = "contact@conflictradar.live";
+const CONTACT_EMAIL = `contact@${constants.APP_NAME}`;
 
 const CATEGORY_KEYS = ["conflict", "protest", "disaster", "political", "economic", "crime", "general"] as const;
 

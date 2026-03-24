@@ -18,9 +18,14 @@ DEFAULT_AGGREGATE_MIN_ARTICLES = int(os.getenv("AGGREGATE_MIN_ARTICLES", "1"))
 # ── Text pipeline ─────────────────────────────────────────────────────────────
 
 def fetch_articles_task(source_code: str | None = None, start_date: datetime | None = None) -> int:
+    now = datetime.now(dt_timezone.utc)
     if start_date is None:
-        start_date = datetime.now(dt_timezone.utc) - timedelta(minutes=DEFAULT_FETCH_MINUTES)
-    return Workflow.fetch_articles(source_code, start_date)
+        start_date = now - timedelta(minutes=DEFAULT_FETCH_MINUTES)
+    # Soft deadline 30 s before the hard RQ timeout fires (interval - 60 s).
+    # Checked between sources so we stop gracefully rather than being force-killed mid-fetch.
+    interval_seconds = int(os.getenv('FETCH_INTERVAL_MINUTES', '10')) * 60
+    deadline = now + timedelta(seconds=interval_seconds - 30)
+    return Workflow.fetch_articles(source_code, start_date, deadline=deadline)
 
 
 def process_articles_task(

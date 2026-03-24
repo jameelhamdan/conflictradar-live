@@ -17,6 +17,11 @@ def _minutes(env_var: str, default: str) -> int:
     return int(os.getenv(env_var, default)) * 60
 
 
+def _interval_timeout(interval_seconds: int) -> int:
+    """Hard-kill timeout: 60 s before the next scheduled run (minimum 60 s)."""
+    return max(interval_seconds - 60, 60)
+
+
 class Command(BaseCommand):
     help = 'Register all periodic jobs with rq-scheduler (idempotent)'
 
@@ -39,7 +44,8 @@ class Command(BaseCommand):
 
         conn = django_rq.get_connection('default')
         scheduler = Scheduler(connection=conn)
-        timeout = int(os.getenv('JOB_TIMEOUT_SECONDS', '1800'))
+        # Used only for cron (daily) jobs where no interval gives a natural bound.
+        cron_timeout = int(os.getenv('JOB_TIMEOUT_SECONDS', '1800'))
 
         # Clear existing scheduled jobs so re-runs are idempotent
         for job in scheduler.get_jobs():
@@ -48,23 +54,36 @@ class Command(BaseCommand):
 
         now = datetime.now(timezone.utc)
 
-        # ── Interval jobs ──────────────────────────────────────────────────────
-        scheduler.schedule(now, fetch_articles_task,   interval=_minutes('FETCH_INTERVAL_MINUTES', '10'),      repeat=None, timeout=timeout)
-        scheduler.schedule(now, process_articles_task, interval=_minutes('PROCESS_INTERVAL_MINUTES', '10'),    repeat=None, timeout=timeout)
-        scheduler.schedule(now, aggregate_events_task, interval=_minutes('AGGREGATE_INTERVAL_MINUTES', '10'),  repeat=None, timeout=timeout)
-        scheduler.schedule(now, tag_topics_task,       interval=_minutes('TAG_TOPICS_INTERVAL_MINUTES', '15'), repeat=None, timeout=timeout)
-        scheduler.schedule(now, discover_topics_task,  interval=_minutes('DISCOVER_TOPICS_INTERVAL_MINUTES', '30'), repeat=None, timeout=timeout)
-        scheduler.schedule(now, fetch_prices_task,     interval=_minutes('PRICE_FETCH_INTERVAL_MINUTES', '5'),      repeat=None, timeout=timeout)
-        scheduler.schedule(now, fetch_notams_task,     interval=_minutes('NOTAM_FETCH_INTERVAL_MINUTES', '15'),     repeat=None, timeout=timeout)
-        scheduler.schedule(now, fetch_earthquakes_task, interval=_minutes('EARTHQUAKE_FETCH_INTERVAL_MINUTES', '5'), repeat=None, timeout=timeout)
-        scheduler.schedule(now, fetch_forex_task,      interval=_minutes('FOREX_FETCH_INTERVAL_MINUTES', '15'),     repeat=None, timeout=timeout)
-        scheduler.schedule(now, run_forecast_task,     interval=_minutes('FORECAST_INTERVAL_MINUTES', '60'),        repeat=None, timeout=timeout)
-        scheduler.schedule(now, score_forecasts_task,  interval=_minutes('FORECAST_SCORE_INTERVAL_MINUTES', '60'),  repeat=None, timeout=timeout)
+        # ── Interval jobs — timeout = interval - 60 s so the job is hard-killed
+        #    just before the next run is queued, preventing worker pile-up.
+        fetch_interval    = _minutes('FETCH_INTERVAL_MINUTES', '10')
+        process_interval  = _minutes('PROCESS_INTERVAL_MINUTES', '10')
+        aggregate_interval = _minutes('AGGREGATE_INTERVAL_MINUTES', '10')
+        tag_interval      = _minutes('TAG_TOPICS_INTERVAL_MINUTES', '15')
+        discover_interval = _minutes('DISCOVER_TOPICS_INTERVAL_MINUTES', '30')
+        price_interval    = _minutes('PRICE_FETCH_INTERVAL_MINUTES', '5')
+        notam_interval    = _minutes('NOTAM_FETCH_INTERVAL_MINUTES', '15')
+        quake_interval    = _minutes('EARTHQUAKE_FETCH_INTERVAL_MINUTES', '5')
+        forex_interval    = _minutes('FOREX_FETCH_INTERVAL_MINUTES', '15')
+        forecast_interval = _minutes('FORECAST_INTERVAL_MINUTES', '60')
+        score_interval    = _minutes('FORECAST_SCORE_INTERVAL_MINUTES', '60')
+
+        scheduler.schedule(now, fetch_articles_task,    interval=fetch_interval,    repeat=None, timeout=_interval_timeout(fetch_interval))
+        scheduler.schedule(now, process_articles_task,  interval=process_interval,  repeat=None, timeout=_interval_timeout(process_interval))
+        scheduler.schedule(now, aggregate_events_task,  interval=aggregate_interval, repeat=None, timeout=_interval_timeout(aggregate_interval))
+        scheduler.schedule(now, tag_topics_task,        interval=tag_interval,      repeat=None, timeout=_interval_timeout(tag_interval))
+        scheduler.schedule(now, discover_topics_task,   interval=discover_interval, repeat=None, timeout=_interval_timeout(discover_interval))
+        scheduler.schedule(now, fetch_prices_task,      interval=price_interval,    repeat=None, timeout=_interval_timeout(price_interval))
+        scheduler.schedule(now, fetch_notams_task,      interval=notam_interval,    repeat=None, timeout=_interval_timeout(notam_interval))
+        scheduler.schedule(now, fetch_earthquakes_task, interval=quake_interval,    repeat=None, timeout=_interval_timeout(quake_interval))
+        scheduler.schedule(now, fetch_forex_task,       interval=forex_interval,    repeat=None, timeout=_interval_timeout(forex_interval))
+        scheduler.schedule(now, run_forecast_task,      interval=forecast_interval, repeat=None, timeout=_interval_timeout(forecast_interval))
+        scheduler.schedule(now, score_forecasts_task,   interval=score_interval,    repeat=None, timeout=_interval_timeout(score_interval))
 
         # ── Cron jobs ──────────────────────────────────────────────────────────
         refresh_hour    = int(os.getenv('TOPICS_REFRESH_HOUR', '4'))
         newsletter_hour = int(os.getenv('NEWSLETTER_GENERATE_HOUR', '6'))
-        scheduler.cron(f'0 {refresh_hour} * * *',    refresh_topics_task,    repeat=None, timeout=timeout)
-        scheduler.cron(f'0 {newsletter_hour} * * *', generate_newsletter_task, repeat=None, timeout=timeout)
+        scheduler.cron(f'0 {refresh_hour} * * *',    refresh_topics_task,      repeat=None, timeout=cron_timeout)
+        scheduler.cron(f'0 {newsletter_hour} * * *', generate_newsletter_task, repeat=None, timeout=cron_timeout)
 
         self.stdout.write(self.style.SUCCESS('Schedule registered: 11 interval jobs + 2 cron jobs.'))

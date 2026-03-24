@@ -81,7 +81,7 @@ class OpenRouterLLMService:
             )
             raise LLMError(f"OpenRouter request failed with status {e.response.status_code}") from e
 
-        except (KeyError, IndexError, AttributeError) as e:
+        except (KeyError, IndexError, AttributeError, TypeError) as e:
             logger.error(
                 "Unexpected response structure from OpenRouter for model %s with messages %s: %s",
                 self._model, messages, str(e)

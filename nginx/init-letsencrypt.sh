@@ -14,14 +14,14 @@
 set -euo pipefail
 
 DOMAIN="${DOMAIN:?Set DOMAIN before running. E.g.: DOMAIN=example.com bash init-letsencrypt.sh}"
-EMAIL="${CERTBOT_EMAIL:-webmaster@${DOMAIN}}"
+CERTBOT_EMAIL="${CERTBOT_EMAIL:-webmaster@${DOMAIN}}"
 STAGING="${CERTBOT_STAGING:-0}"
 
 CERTBOT_WWW="./certbot/www"
 CERTBOT_CONF="./certbot/conf"
 
 echo "==> Domain:  $DOMAIN"
-echo "==> Email:   $EMAIL"
+echo "==> Email:   $CERTBOT_EMAIL"
 echo "==> Staging: $STAGING"
 
 # 1. Create required directories
@@ -102,7 +102,7 @@ DOMAIN="$DOMAIN" docker compose run --rm --entrypoint "" certbot \
         --webroot \
         --webroot-path=/var/www/certbot \
         ${staging_flag} \
-        --email "$EMAIL" \
+        --email "$CERTBOT_EMAIL" \
         --domains "$DOMAIN" --domains "www.$DOMAIN" \
         --rsa-key-size 4096 \
         --agree-tos \

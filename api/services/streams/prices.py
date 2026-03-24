@@ -45,7 +45,7 @@ YAHOO_STREAM_KEY = {
 }
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (compatible; conflictradar-live/1.0)',
+    'User-Agent': f'Mozilla/5.0 (compatible; {settings.APP_NAME}/1.0)',
     'Accept': 'application/json',
 }
 

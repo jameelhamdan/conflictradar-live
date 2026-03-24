@@ -15,6 +15,7 @@ services:
       args:
         VITE_GA_ID: ${VITE_GA_ID:-}
         VITE_DOMAIN: ${VITE_DOMAIN:-}
+        VITE_APP_NAME: ${VITE_APP_NAME:-}
     command: sh -c "cp -r /app/dist/. /frontend_dist/"
     restart: "no"
     volumes:
@@ -66,10 +67,6 @@ services:
     env_file: .env.app
     volumes:
       - ./media_data:/app/media
-    deploy:
-      resources:
-        limits:
-          memory: 1g
 
   scheduler:
     container_name: scheduler

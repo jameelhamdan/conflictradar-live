@@ -5,6 +5,11 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
+    replaces = [
+        ('contenttypes', '0001_initial'),
+        ('contenttypes', '0002_alter_contenttype_options'),
+    ]
+
     initial = True
 
     dependencies = []
@@ -20,15 +25,10 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'content type',
                 'verbose_name_plural': 'content types',
-                'db_table': 'django_content_type',
-                'ordering': ('app_label', 'model'),
+                'unique_together': {('app_label', 'model')},
             },
             managers=[
                 ('objects', django.contrib.contenttypes.models.ContentTypeManager()),
             ],
-        ),
-        migrations.AlterUniqueTogether(
-            name='contenttype',
-            unique_together={('app_label', 'model')},
         ),
     ]

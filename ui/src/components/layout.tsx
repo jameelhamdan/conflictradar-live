@@ -14,10 +14,13 @@ export function SiteLogo({ size = "sm" }: SiteLogoProps) {
     size === "lg"
       ? "text-4xl font-extrabold leading-none tracking-tight md:text-5xl lg:text-6xl"
       : "text-[0.95rem] font-bold tracking-tight";
+  const dotIndex = constants.APP_NAME.lastIndexOf(".");
+  const base = dotIndex > 0 ? constants.APP_NAME.slice(0, dotIndex) : constants.APP_NAME;
+  const tld = dotIndex > 0 ? constants.APP_NAME.slice(dotIndex) : "";
   return (
     <span dir="ltr" className="inline-flex">
-      <span className={cn(sizeClass, "text-foreground")}>conflictradar</span>
-      <span className={cn(sizeClass, "text-app-accent-red")}>.live</span>
+      <span className={cn(sizeClass, "text-foreground")}>{base}</span>
+      {tld && <span className={cn(sizeClass, "text-app-accent-red")}>{tld}</span>}
     </span>
   );
 }

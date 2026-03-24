@@ -6,6 +6,11 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
+    replaces = [
+        ('newsletter', '0001_initial'),
+        ('newsletter', '0002_body_field'),
+    ]
+
     initial = True
 
     dependencies = []
@@ -38,8 +43,13 @@ class Migration(migrations.Migration):
                     auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('date', models.DateField(unique=True)),
                 ('subject', models.CharField(max_length=255)),
-                ('html_body', models.TextField()),
-                ('text_body', models.TextField()),
+                ('body', models.TextField(help_text='Newsletter content in Markdown format')),
+                ('articles', models.JSONField(
+                    blank=True, default=list,
+                    help_text='Snapshot of articles referenced in this newsletter',
+                )),
+                ('cover_image_url', models.URLField(blank=True, max_length=512, null=True)),
+                ('cover_image_credit', models.CharField(blank=True, max_length=255, null=True)),
                 ('generated_at', models.DateTimeField(auto_now_add=True)),
                 ('sent_at', models.DateTimeField(blank=True, null=True)),
                 ('sent_count', models.IntegerField(default=0)),

@@ -1,4 +1,5 @@
 import type { Language } from "../contexts/LanguageContext"
+import constants from "@/constants"
 
 export interface UIStrings {
   about: string
@@ -180,11 +181,11 @@ export const UI: Record<Language, UIStrings> = {
       "A real-time intelligence platform that turns raw news into a global conflict picture.",
     aboutWhatWeDoTitle: "What we do",
     aboutWhatWeDo:
-      "conflictradar.live monitors hundreds of news sources — Telegram channels, wire feeds, and regional outlets — and uses natural language processing to extract, classify, and geolocate events as they happen. The result is an interactive live map where you can explore ongoing conflicts, protests, disasters, and political developments anywhere in the world.",
+      `${constants.APP_NAME} monitors hundreds of news sources — Telegram channels, wire feeds, and regional outlets — and uses natural language processing to extract, classify, and geolocate events as they happen. The result is an interactive live map where you can explore ongoing conflicts, protests, disasters, and political developments anywhere in the world.`,
     aboutLegendTitle: "Category legend",
     aboutContactTitle: "Contact",
     aboutContactFooter:
-      'conflictradar.live is a small independent project. We aim to respond within 48 hours but cannot guarantee replies to every message. For urgent operational matters, include "URGENT" in the subject line.',
+      `${constants.APP_NAME} is a small independent project. We aim to respond within 48 hours but cannot guarantee replies to every message. For urgent operational matters, include "URGENT" in the subject line.`,
     contactLabelGeneral: "General enquiries",
     contactLabelData: "Source & data requests",
     contactLabelPress: "Press & media",
@@ -320,11 +321,11 @@ export const UI: Record<Language, UIStrings> = {
       "منصة استخبارات آنية تحول الأخبار الخام إلى صورة شاملة للنزاعات العالمية.",
     aboutWhatWeDoTitle: "ما نفعله",
     aboutWhatWeDo:
-      "ترصد conflictradar.live مئات المصادر الإخبارية — قنوات تيليغرام ووكالات الأنباء والمنافذ الإقليمية — وتستخدم معالجة اللغة الطبيعية لاستخلاص الأحداث وتصنيفها وتحديد مواقعها الجغرافية فور وقوعها. والنتيجة خريطة تفاعلية حية يمكنك من خلالها استكشاف النزاعات والاحتجاجات والكوارث والتطورات السياسية في أي مكان من العالم.",
+      `ترصد ${constants.APP_NAME} مئات المصادر الإخبارية — قنوات تيليغرام ووكالات الأنباء والمنافذ الإقليمية — وتستخدم معالجة اللغة الطبيعية لاستخلاص الأحداث وتصنيفها وتحديد مواقعها الجغرافية فور وقوعها. والنتيجة خريطة تفاعلية حية يمكنك من خلالها استكشاف النزاعات والاحتجاجات والكوارث والتطورات السياسية في أي مكان من العالم.`,
     aboutLegendTitle: "دليل التصنيفات",
     aboutContactTitle: "تواصل معنا",
     aboutContactFooter:
-      "conflictradar.live مشروع مستقل صغير. نسعى للرد خلال ٤٨ ساعة، لكن لا نستطيع ضمان الرد على جميع الرسائل. للأمور العاجلة، يرجى كتابة «عاجل» في سطر الموضوع.",
+      `${constants.APP_NAME} مشروع مستقل صغير. نسعى للرد خلال ٤٨ ساعة، لكن لا نستطيع ضمان الرد على جميع الرسائل. للأمور العاجلة، يرجى كتابة «عاجل» في سطر الموضوع.`,
     contactLabelGeneral: "استفسارات عامة",
     contactLabelData: "طلبات المصادر والبيانات",
     contactLabelPress: "الإعلام والصحافة",

@@ -14,7 +14,7 @@
         <tr>
           <td style="background:#13131c;padding:20px 32px;border-radius:8px 8px 0 0;">
             <span style="font-size:1.1rem;font-weight:700;color:#e8e8f0;letter-spacing:-0.01em;">
-              conflictradar<span style="color:#e05252;">.live</span>
+              {{ app_name }}
             </span>
             <span style="float:right;font-size:0.78rem;color:#55556a;line-height:2.2;">{{ date_str }}</span>
           </td>
@@ -40,7 +40,7 @@
         <tr>
           <td style="background:#f4f4f7;padding:20px 32px;border-radius:0 0 8px 8px;text-align:center;">
             <p style="margin:0;font-size:0.72rem;color:#999;line-height:1.6;">
-              You're receiving this because you subscribed to the conflictradar.live daily briefing.<br>
+              You're receiving this because you subscribed to the {{ app_name }} daily briefing.<br>
               <a href="{{ unsubscribe_url }}" style="color:#7c9ef8;text-decoration:none;">Unsubscribe</a>
               &nbsp;·&nbsp;
               <a href="{{ base_url }}/newsletter" style="color:#7c9ef8;text-decoration:none;">View in browser</a>

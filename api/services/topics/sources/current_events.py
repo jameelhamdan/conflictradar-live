@@ -31,6 +31,7 @@ import re
 from datetime import date, timedelta
 
 import requests
+from django.conf import settings
 from scrapling.parser import Selector
 
 from services.topics.types import TopicDict
@@ -124,7 +125,7 @@ def _fetch_html(title: str) -> str:
                 'disableeditsection': '1',
             },
             timeout=30,
-            headers={'User-Agent': 'happinga-meter/1.0'},
+            headers={'User-Agent': f'{settings.APP_NAME}/1.0'},
         )
         r.raise_for_status()
         data = r.json()

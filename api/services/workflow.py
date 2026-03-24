@@ -10,7 +10,7 @@ import os
 import re
 import requests
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -51,10 +51,18 @@ def _fetch_og_image(url: str) -> str | None:
 
 class Workflow:
     @classmethod
-    def fetch_articles(cls, source_code: str | None, start_date: datetime) -> int:
+    def fetch_articles(
+        cls,
+        source_code: str | None,
+        start_date: datetime,
+        deadline: datetime | None = None,
+    ) -> int:
         """
         Fetch messages from one or all sources starting at start_date and save as Articles.
         Returns the total number of newly created articles.
+
+        deadline: if provided, stops between sources once the current time exceeds it,
+                  so the task exits cleanly before the RQ hard-kill fires.
         """
         from services.data import DataService
         from core.models import Source
@@ -65,7 +73,13 @@ class Workflow:
             else list(Source.objects.filter(is_enabled=True))
         )
         total = 0
-        for source in sources:
+        for i, source in enumerate(sources):
+            if deadline is not None and datetime.now(dt_timezone.utc) >= deadline:
+                logger.warning(
+                    '[fetch] deadline reached — stopping after %d/%d source(s)',
+                    i, len(sources),
+                )
+                break
             try:
                 count = DataService(source).refresh_until(start_date)
                 total += count

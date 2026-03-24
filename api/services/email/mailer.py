@@ -25,9 +25,9 @@ def send_confirmation_email(sub) -> None:
     base_url = getattr(settings, 'NEWSLETTER_BASE_URL', 'http://localhost')
     from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'newsletter@localhost')
     confirm_url = f'{base_url}/newsletter/confirm/{sub.token}'
-    subject = 'Confirm your subscription — conflictradar.live'
+    subject = f'Confirm your subscription — {settings.APP_NAME}'
 
-    context = {'confirm_url': confirm_url}
+    context = {'confirm_url': confirm_url, 'app_name': settings.APP_NAME}
     html = render_to_string('newsletter/confirm_email.html', context)
     text = render_to_string('newsletter/confirm_email.txt', context)
 

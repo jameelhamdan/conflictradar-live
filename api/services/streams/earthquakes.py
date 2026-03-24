@@ -14,7 +14,7 @@ from .base import BaseStream, redis_publish
 logger = logging.getLogger(__name__)
 
 USGS_URL = 'https://earthquake.usgs.gov/fdsnws/event/1/query'
-HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; conflictradar-live/1.0)'}
+HEADERS = {'User-Agent': f'Mozilla/5.0 (compatible; {settings.APP_NAME}/1.0)'}
 
 
 class EarthquakeStream(BaseStream):

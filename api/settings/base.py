@@ -28,8 +28,10 @@ VERSION = f'{ENV_NAME}-{app.__build__}'
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False)
 
+APP_NAME = config('APP_NAME', default='conflictradar.live')
+
 ADMINS = (
-    ('admin', 'contact@conflictradar.live'),
+    ('admin', f'contact@{APP_NAME}'),
 )
 
 ALLOWED_HOSTS = ['*']
