@@ -14,14 +14,16 @@ from django.conf import settings
 _JOB_TIMEOUT = int(os.getenv("JOB_TIMEOUT_SECONDS", "1800"))
 
 
-def enqueue(func, *args, **kwargs):
-    """Enqueue *func* on the default RQ queue.
+def enqueue(func, *args, queue: str = 'default', **kwargs):
+    """Enqueue *func* on an RQ queue.
 
-    Falls back to a direct synchronous call when ``TASK_QUEUE_ENABLED`` is
-    ``False`` so that local development works without Redis.
+    ``queue`` selects between ``'default'`` (light I/O tasks) and ``'heavy'``
+    (NLP / LLM tasks).  Falls back to a direct synchronous call when
+    ``TASK_QUEUE_ENABLED`` is ``False`` so that local development works without
+    Redis.
     """
     if getattr(settings, 'TASK_QUEUE_ENABLED', False):
-        queue = django_rq.get_queue('default')
-        queue.enqueue(func, *args, job_timeout=_JOB_TIMEOUT, **kwargs)
+        rq_queue = django_rq.get_queue(queue)
+        rq_queue.enqueue(func, *args, job_timeout=_JOB_TIMEOUT, **kwargs)
     else:
         func(*args, **kwargs)

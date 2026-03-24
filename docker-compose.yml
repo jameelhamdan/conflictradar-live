@@ -56,8 +56,20 @@ services:
       - ./media_data:/app/media
       - ./.static:/app/.static
 
-  worker:
-    container_name: worker
+  worker-heavy:
+    container_name: worker-heavy
+    build: ./api
+    restart: always
+    command: sh -c "python manage.py rqworker heavy"
+    depends_on:
+      - mongo
+      - redis
+    env_file: .env.app
+    volumes:
+      - ./media_data:/app/media
+
+  worker-light:
+    container_name: worker-light
     build: ./api
     restart: always
     command: sh -c "python manage.py rqworker default"

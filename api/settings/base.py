@@ -241,7 +241,13 @@ _REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 _JOB_TIMEOUT = int(config('JOB_TIMEOUT_SECONDS', default=1800))
 
 RQ_QUEUES = {
+    # Light queue — fast I/O tasks (fetchers, stream collectors)
     'default': {
+        'URL': _REDIS_URL,
+        'DEFAULT_TIMEOUT': _JOB_TIMEOUT,
+    },
+    # Heavy queue — NLP / LLM tasks (processing, clustering, topic matching, forecasting)
+    'heavy': {
         'URL': _REDIS_URL,
         'DEFAULT_TIMEOUT': _JOB_TIMEOUT,
     },
