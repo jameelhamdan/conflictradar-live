@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from services.workflow import Workflow
 
 JOB_TIMEOUT_SECONDS = int(os.getenv("JOB_TIMEOUT_SECONDS", "1800"))
-DEFAULT_FETCH_HOURS = int(os.getenv("FETCH_LOOKBACK_HOURS", "1"))
+DEFAULT_FETCH_MINUTES = int(os.getenv("FETCH_INTERVAL_MINUTES", "10")) * 2
 DEFAULT_PROCESS_LIMIT = int(os.getenv("PROCESS_LIMIT", "1000"))
 DEFAULT_AGGREGATE_HOURS = int(os.getenv("AGGREGATE_HOURS", "24"))
 DEFAULT_AGGREGATE_MIN_ARTICLES = int(os.getenv("AGGREGATE_MIN_ARTICLES", "1"))
@@ -19,7 +19,7 @@ DEFAULT_AGGREGATE_MIN_ARTICLES = int(os.getenv("AGGREGATE_MIN_ARTICLES", "1"))
 
 def fetch_articles_task(source_code: str | None = None, start_date: datetime | None = None) -> int:
     if start_date is None:
-        start_date = datetime.now(dt_timezone.utc) - timedelta(hours=DEFAULT_FETCH_HOURS)
+        start_date = datetime.now(dt_timezone.utc) - timedelta(minutes=DEFAULT_FETCH_MINUTES)
     return Workflow.fetch_articles(source_code, start_date)
 
 
