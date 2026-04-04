@@ -173,11 +173,11 @@ def _li_nested_ul(li_node):
     return None
 
 
-def _emit_topic(name: str, category: str, source_url: str, results: dict) -> None:
+def _emit_topic(name: str, category: str, source_url: str, results: dict, parent_slug: str | None = None) -> None:
     slug = _SLUG_RE.sub('-', name.lower()).strip('-')[:80]
     if not slug or slug in results:
         return
-    results[slug] = {
+    entry: dict = {
         'slug': slug,
         'name': name[:255],
         'keywords': _tokens(name)[:15],
@@ -187,6 +187,9 @@ def _emit_topic(name: str, category: str, source_url: str, results: dict) -> Non
         'source_url': source_url,
         'is_current': True,
     }
+    if parent_slug:
+        entry['parent'] = parent_slug
+    results[slug] = entry
 
 
 def _parse_day(html: str, source_url: str) -> dict[str, TopicDict]:
@@ -233,8 +236,10 @@ def _parse_day(html: str, source_url: str) -> dict[str, TopicDict]:
                     continue  # leaf news event, skip
 
                 name0 = _li_topic_name(li0)
+                slug0 = None
                 if name0:
                     _emit_topic(name0, current_category, source_url, results)
+                    slug0 = _SLUG_RE.sub('-', name0.lower()).strip('-')[:80]
 
                 # Depth-1: direct <li> children of the depth-0 nested <ul>
                 for li1 in nested0.children:
@@ -247,7 +252,7 @@ def _parse_day(html: str, source_url: str) -> dict[str, TopicDict]:
 
                     name1 = _li_topic_name(li1)
                     if name1:
-                        _emit_topic(name1, current_category, source_url, results)
+                        _emit_topic(name1, current_category, source_url, results, parent_slug=slug0)
 
     return results
 

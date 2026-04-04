@@ -6,9 +6,43 @@ LLMTopicMatcher — LLM-based batch matching (semantic, used for regular tagging
 """
 import json
 import logging
+import os
 import re
 
 logger = logging.getLogger(__name__)
+
+_LLM_PREFILTER_K = int(os.getenv('LLM_TOPIC_PREFILTER_K', '30'))
+
+
+def _prefilter_topics(events: list, topics: list, top_k: int = _LLM_PREFILTER_K) -> list:
+    """
+    Select the top_k topics most semantically relevant to the event batch using
+    sentence-transformer cosine similarity. Falls back to the full list on any error.
+    """
+    if len(topics) <= top_k:
+        return topics
+    try:
+        from sentence_transformers.util import cos_sim
+
+        from services.processing.clustering import get_clusterer
+        model = get_clusterer()._model
+        event_texts = [
+            ' '.join(filter(None, [e.title, e.location_name, e.category]))
+            for e in events
+        ]
+        topic_texts = [
+            ' '.join(filter(None, [t.name, ' '.join(t.keywords or []), getattr(t, 'description', '') or '']))
+            for t in topics
+        ]
+        event_embs = model.encode(event_texts, convert_to_tensor=True, show_progress_bar=False)
+        topic_embs = model.encode(topic_texts, convert_to_tensor=True, show_progress_bar=False)
+        query = event_embs.mean(dim=0, keepdim=True)
+        scores = cos_sim(query, topic_embs)[0]
+        top_indices = scores.topk(min(top_k, len(topics))).indices.tolist()
+        return [topics[i] for i in top_indices]
+    except Exception as exc:
+        logger.warning('[topics] embedding prefilter failed (%s) — using all %d topics', exc, len(topics))
+        return topics
 
 _SPLIT_RE = re.compile(r'[^a-zA-Z0-9]+')
 
@@ -74,6 +108,55 @@ class TopicMatcher:
         return result
 
 
+class EmbeddingTopicMatcher:
+    """
+    Embedding-based topic matcher using sentence-transformer cosine similarity.
+
+    Used for retroactive tagging (replacing keyword-only TopicMatcher) and as a
+    fallback in tag_events_with_topics when the LLM returns no matches for an event.
+    Reuses the same model singleton as SemanticClusterer — no second model load.
+    """
+
+    THRESHOLD = float(os.getenv('EMBEDDING_MATCH_THRESHOLD', '0.45'))
+
+    def match(self, event, topics: list) -> dict[str, float]:
+        """
+        Match a single event against a list of topics using cosine similarity.
+
+        Returns dict mapping slug → score for all topics above THRESHOLD.
+        Falls back to TopicMatcher on any error.
+        """
+        if not topics:
+            return {}
+        try:
+            from sentence_transformers.util import cos_sim
+            from services.processing.clustering import get_clusterer
+
+            model = get_clusterer()._model
+            event_text = ' '.join(filter(None, [event.title, event.location_name, event.category]))
+            topic_texts = [
+                ' '.join(filter(None, [
+                    t.name,
+                    ' '.join(t.keywords or []),
+                    (getattr(t, 'description', '') or '')[:120],
+                ]))
+                for t in topics
+            ]
+
+            event_emb = model.encode([event_text], convert_to_tensor=True, show_progress_bar=False)
+            topic_embs = model.encode(topic_texts, convert_to_tensor=True, show_progress_bar=False)
+            scores = cos_sim(event_emb, topic_embs)[0].tolist()
+
+            return {
+                topics[i].slug: round(float(s), 3)
+                for i, s in enumerate(scores)
+                if s >= self.THRESHOLD
+            }
+        except Exception as exc:
+            logger.warning('[topics] EmbeddingTopicMatcher failed (%s) — falling back to TopicMatcher', exc)
+            return TopicMatcher().match(event, topics)
+
+
 class LLMTopicMatcher:
     """
     LLM-based batch topic matcher.
@@ -99,14 +182,6 @@ class LLMTopicMatcher:
 
         results: dict[str, dict[str, float]] = {str(e.pk): {} for e in events}
 
-        # Build prompt fragments shared across all batches
-        situation_lines = '\n'.join(
-            f'- {t.slug}: {t.name}'
-            + (f' — {t.description[:120]}' if getattr(t, 'description', '') else '')
-            for t in topics
-        )
-        valid_slugs = {t.slug for t in topics}
-
         llm = get_llm_service()
         total_batches = (len(events) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
 
@@ -114,6 +189,15 @@ class LLMTopicMatcher:
             batch = events[batch_start: batch_start + self.BATCH_SIZE]
             batch_num = batch_start // self.BATCH_SIZE + 1
             logger.info('[topics] LLM batch %d/%d (%d events)', batch_num, total_batches, len(batch))
+
+            # Pre-filter topics to top-K most relevant for this specific batch
+            batch_topics = _prefilter_topics(batch, topics)
+            situation_lines = '\n'.join(
+                f'- {t.slug}: {t.name}'
+                + (f' — {t.description[:120]}' if getattr(t, 'description', '') else '')
+                for t in batch_topics
+            )
+            valid_slugs = {t.slug for t in batch_topics}
 
             event_lines = '\n'.join(
                 f'{i + 1}. (id={e.pk}) {e.title or "(no title)"}'

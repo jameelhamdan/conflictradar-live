@@ -16,7 +16,7 @@ export default function TopicsPanel({ activeTopic, onTopicClick }: TopicsPanelPr
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
-    fetchTopics({ active: true, current: true })
+    fetchTopics({ active: true, current: true, top_level: true })
       .then(setTopics)
       .catch(() => {})
   }, [])

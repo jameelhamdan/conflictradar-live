@@ -93,3 +93,67 @@ def run_forecast_task() -> int:
 def score_forecasts_task() -> int:
     from services.forecasting.service import score_forecasts
     return score_forecasts()
+
+
+# ── Maintenance tasks ──────────────────────────────────────────────────────────
+
+def purge_articles_task() -> int:
+    """
+    Two-phase article cleanup for aggregated articles:
+
+    Phase 1 (ARTICLE_ARCHIVE_HOURS, default 48h): Clear heavy fields (content,
+    entities) on aggregated articles to free storage while keeping metadata
+    (title, source_url, published_on, etc.) for EventDetailView and newsletter.
+
+    Phase 2 (ARTICLE_RETENTION_HOURS, default 168h / 7 days): Hard-delete the
+    now-metadata-only articles.
+
+    Returns the total number of articles affected (archived + deleted).
+    """
+    import logging as _logging
+    import uuid as _uuid
+
+    from django.utils import timezone
+
+    from core.models import Article, Event
+
+    _log = _logging.getLogger(__name__)
+    archive_hours = int(os.getenv('ARTICLE_ARCHIVE_HOURS', '48'))
+    retention_hours = int(os.getenv('ARTICLE_RETENTION_HOURS', '168'))
+    now = timezone.now()
+    archive_cutoff = now - timedelta(hours=archive_hours)
+    retention_cutoff = now - timedelta(hours=retention_hours)
+    window_start = now - timedelta(days=30)
+
+    aggregated_ids: set[str] = set()
+    for event in Event.objects.filter(started_at__gte=window_start).only('article_ids'):
+        for aid in (event.article_ids or []):
+            aggregated_ids.add(str(aid))
+
+    if not aggregated_ids:
+        return 0
+
+    uuids = []
+    for raw in aggregated_ids:
+        try:
+            uuids.append(_uuid.UUID(raw))
+        except (ValueError, AttributeError):
+            pass
+
+    # Phase 1: Clear content + entities on articles older than archive_hours
+    archived = Article.objects.filter(
+        id__in=uuids,
+        published_on__lt=archive_cutoff,
+    ).update(content='', entities=[])
+    if archived:
+        _log.info('[purge] Archived (cleared content) %d article(s) older than %dh', archived, archive_hours)
+
+    # Phase 2: Hard-delete articles older than retention_hours
+    deleted, _ = Article.objects.filter(
+        id__in=uuids,
+        published_on__lt=retention_cutoff,
+    ).delete()
+    if deleted:
+        _log.info('[purge] Deleted %d article(s) older than %dh', deleted, retention_hours)
+
+    return archived + deleted

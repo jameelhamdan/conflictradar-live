@@ -15,6 +15,7 @@ export interface Topic {
   description?: string
   category?: string
   source_url?: string
+  parent_slug?: string
   is_current: boolean
   is_active: boolean
   is_pinned?: boolean

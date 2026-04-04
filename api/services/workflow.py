@@ -101,12 +101,16 @@ class Workflow:
         Step 2 — Clean: run HuggingFace NER + VADER sentiment on Articles; use LLM for category + location.
         Returns the number of articles processed.
         """
-        from core.models import Article, ArticleDocument
+        from core.models import Article, ArticleDocument, Source
         from services.processing.cleaner import ArticleCleaner, CleaningError
 
         qs = Article.objects.all()
         if source_code:
             qs = qs.filter(source_code=source_code)
+        else:
+            # Exclude articles from disabled sources
+            enabled_codes = list(Source.objects.filter(is_enabled=True).values_list('code', flat=True))
+            qs = qs.filter(source_code__in=enabled_codes)
         if not reprocess:
             qs = qs.filter(processed_on__isnull=True)
         articles = list(qs[:limit])
@@ -122,6 +126,9 @@ class Workflow:
 
         processed = 0
         for article in articles:
+            # Skip articles whose content was cleared by phase-1 archival
+            if not article.content and article.processed_on:
+                continue
             doc = ArticleDocument(
                 id=str(article.id),
                 title=article.title,
@@ -169,14 +176,16 @@ class Workflow:
         Uses lat/lng stored by the geocoder during process_articles.
         Returns (created_count, updated_count).
         """
-        from core.models import Article, Event
+        from core.models import Article, Event, Source
 
         lookback = timezone.now() - timedelta(hours=hours)
+        enabled_codes = list(Source.objects.filter(is_enabled=True).values_list('code', flat=True))
         articles = list(
             Article.objects.filter(
                 processed_on__isnull=False,
                 location__isnull=False,
                 published_on__gte=lookback,
+                source_code__in=enabled_codes,
             ).exclude(location='')
         )
 
@@ -331,8 +340,12 @@ class Workflow:
             return 0
 
         from services.topics.dedup import semantic_merge_topics
-        scraped = semantic_merge_topics(scraped)
+        scraped = semantic_merge_topics(scraped, threshold=0.80)
         scraped = cls._enrich_topics(scraped)
+
+        # Sort so root topics (no parent) are upserted before their children.
+        # This ensures parent_slug FK lookups in downstream code never hit a missing parent.
+        scraped.sort(key=lambda t: 0 if not t.get('parent') else 1)
 
         valid_categories = {c.value for c in EventCategory}
         seen_slugs: set[str] = set()
@@ -462,6 +475,22 @@ class Workflow:
         # Use all active topics — named conflicts span years so temporal filtering
         # is unnecessary and would reduce recall.
         batch_results = llm_matcher.match_batch(events, all_active_topics)
+
+        # Embedding fallback: for events the LLM returned no matches for,
+        # run EmbeddingTopicMatcher to catch semantically related topics it missed.
+        from services.topics.matcher import EmbeddingTopicMatcher
+        emb_matcher = EmbeddingTopicMatcher()
+        for event in events:
+            event_key = str(event.pk)
+            if not batch_results.get(event_key):
+                result = emb_matcher.match(event, all_active_topics)
+                if result:
+                    batch_results[event_key] = result
+                    logger.info(
+                        '[topics] Embedding fallback tagged "%s" → %s',
+                        (event.title or '')[:60],
+                        ', '.join(f'{s}({c:.2f})' for s, c in result.items()),
+                    )
 
         tagged = 0
         for event in events:
@@ -632,7 +661,10 @@ class Workflow:
             avg_intensity = round(sum(intensities) / len(intensities), 4) if intensities else 0.0
             score = round(articles_24h * (1 + avg_intensity) * recency, 4)
 
-            new_top_level = topic.is_pinned or (score >= THRESHOLD)
+            # Children (topics with a parent_slug) are never promoted to top-level —
+            # they are shown under their parent, not in the root pill list.
+            has_parent = bool(getattr(topic, 'parent_slug', None))
+            new_top_level = not has_parent and (topic.is_pinned or score >= THRESHOLD)
 
             changed = (
                 topic.event_count != new_count
@@ -653,7 +685,7 @@ class Workflow:
         Returns the number of events tagged with this topic.
         """
         from core.models import Topic, Event
-        from services.topics.matcher import TopicMatcher
+        from services.topics.matcher import EmbeddingTopicMatcher
 
         try:
             topic = Topic.objects.get(slug=slug)
@@ -672,7 +704,7 @@ class Workflow:
             logger.info('[topics] retroactive_tag_topic: no events to process for %s', slug)
             return 0
 
-        matcher = TopicMatcher()
+        matcher = EmbeddingTopicMatcher()
         tagged_count = 0
 
         for event in events:
@@ -698,16 +730,53 @@ class Workflow:
         )
         return tagged_count
 
+    @staticmethod
+    def _find_parent_slug(name: str, category: str, candidates: list, threshold: float = 0.65) -> str | None:
+        """
+        Return the slug of the closest existing top-level topic to assign as parent,
+        or None if no candidate exceeds the similarity threshold.
+        """
+        if not candidates:
+            return None
+        try:
+            from sentence_transformers.util import cos_sim
+            from services.processing.clustering import get_clusterer
+
+            model = get_clusterer()._model
+            query_text = f'{name} {category}'
+            candidate_texts = [
+                ' '.join(filter(None, [
+                    t.name,
+                    t.category,
+                    ' '.join((t.keywords or [])[:8]),
+                ]))
+                for t in candidates
+            ]
+            query_emb = model.encode([query_text], convert_to_tensor=True, show_progress_bar=False)
+            cand_embs = model.encode(candidate_texts, convert_to_tensor=True, show_progress_bar=False)
+            scores = cos_sim(query_emb, cand_embs)[0].tolist()
+            best_idx = max(range(len(scores)), key=lambda i: scores[i])
+            if scores[best_idx] >= threshold:
+                return candidates[best_idx].slug
+        except Exception as exc:
+            logger.warning('[discover] parent lookup failed: %s', exc)
+        return None
+
     @classmethod
     def discover_topics_from_events(cls, hours: int = 6) -> int:
         """
-        Scan recent untagged events, group by (category, country), and use the LLM
+        Scan recent untagged events, cluster them semantically, and use the LLM
         to discover new topics for clusters above a minimum size.
+
+        Groups events by semantic similarity (not geography) so multi-country
+        situations are captured as a single topic. Newly discovered topics are
+        assigned a parent_slug if a sufficiently similar top-level topic already exists.
 
         Returns the number of new topics created.
         """
         from core.models import Event, Topic, EventCategory
         from services.llm import get_llm_service
+        from services.processing.clustering import get_clusterer
         from services.queue import enqueue
         from services.tasks import retroactive_tag_topic_task
 
@@ -726,38 +795,43 @@ class Workflow:
             logger.info('[discover] No untagged events in the last %dh', hours)
             return 0
 
-        # Group by (category, country) — extract country as second part of "City, Country"
-        buckets: dict[tuple[str, str], list] = defaultdict(list)
-        for event in untagged:
-            parts = event.location_name.split(',')
-            country = parts[-1].strip() if len(parts) > 1 else event.location_name.strip()
-            bucket_key = (event.category or 'general', country)
-            buckets[bucket_key].append(event)
+        # Cluster by semantic similarity instead of geographic bucketing.
+        # A threshold of 0.50 is intentionally loose to catch multi-country events
+        # that share the same underlying topic.
+        clusterer = get_clusterer()
+        semantic_clusters = clusterer.cluster(untagged, threshold=0.50)
 
-        # Filter to clusters that meet the minimum size, take top N by cluster size
+        # Filter to clusters that meet minimum size, take top N by size
         candidates = sorted(
-            [(key, evts) for key, evts in buckets.items() if len(evts) >= DISCOVERY_MIN_UNTAGGED],
-            key=lambda x: len(x[1]),
+            [c for c in semantic_clusters if len(c) >= DISCOVERY_MIN_UNTAGGED],
+            key=lambda c: len(c),
             reverse=True,
         )[:DISCOVERY_MAX_CLUSTERS]
 
         if not candidates:
-            logger.info('[discover] No clusters meet the minimum size of %d', DISCOVERY_MIN_UNTAGGED)
+            logger.info('[discover] No semantic clusters meet the minimum size of %d', DISCOVERY_MIN_UNTAGGED)
             return 0
 
         import json as _json
-        from services.tasks import retroactive_tag_topic_task
 
         valid_categories = {c.value for c in EventCategory}
         llm = get_llm_service()
+        # Load existing top-level topics once for parent assignment
+        existing_top_level = list(Topic.objects.filter(is_top_level=True, is_active=True))
         created_count = 0
 
-        for (category, country), events in candidates:
-            titles_sample = '\n'.join(f'- {e.title}' for e in events[:10])
+        for cluster in candidates:
+            # Determine dominant category from the cluster
+            cats = [e.category for e in cluster if e.category]
+            category = max(set(cats), key=cats.count) if cats else 'general'
+
+            titles_sample = '\n'.join(f'- {e.title}' for e in cluster[:10])
+            locations_sample = ', '.join({e.location_name for e in cluster[:5] if e.location_name})
             prompt = (
-                f'You are a news analyst. The following events all occurred in {country} '
-                f'and are categorized as "{category}". They have not been matched to any '
-                f'known topic yet.\n\nEvent titles:\n{titles_sample}\n\n'
+                f'You are a news analyst. The following news events appear to share a common topic. '
+                f'Locations involved: {locations_sample or "unknown"}. '
+                f'Dominant category: "{category}".\n\n'
+                f'Event titles:\n{titles_sample}\n\n'
                 f'If these events share a coherent ongoing news topic, respond with a JSON '
                 f'object with fields: slug (kebab-case, max 80 chars), name (concise, max 80 chars), '
                 f'keywords (list of 5-15 relevant keywords), category (one of: '
@@ -788,6 +862,10 @@ class Workflow:
                 if cat not in valid_categories:
                     cat = category if category in valid_categories else ''
 
+                # Try to assign a parent from existing top-level topics so the new
+                # topic slots into the tree rather than becoming an orphan root.
+                parent_slug = cls._find_parent_slug(name, cat, existing_top_level)
+
                 Topic.objects.create(
                     slug=slug,
                     name=name,
@@ -795,17 +873,21 @@ class Workflow:
                     description=(data.get('description') or '')[:1000],
                     category=cat,
                     source_ids=['event-discovery'],
+                    parent_slug=parent_slug,
                     is_current=True,
                     is_active=True,
                     is_top_level=False,
                     started_at=timezone.now(),
                 )
                 created_count += 1
-                logger.info('[discover] Created topic from events: %s (%s / %s)', slug, category, country)
+                logger.info(
+                    '[discover] Created topic: %s (parent=%s, cluster=%d events)',
+                    slug, parent_slug or 'none', len(cluster),
+                )
                 enqueue(retroactive_tag_topic_task, slug=slug)
 
             except Exception as exc:
-                logger.warning('[discover] LLM call failed for (%s, %s): %s', category, country, exc)
+                logger.warning('[discover] LLM call failed for cluster of %d: %s', len(cluster), exc)
 
         logger.info('[discover] discover_topics_from_events done — %d new topic(s) created', created_count)
         return created_count

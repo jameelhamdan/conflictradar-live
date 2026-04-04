@@ -89,6 +89,8 @@ services:
       - mongo
       - redis
     env_file: .env.app
+    environment:
+      - TOPIC_SOURCES_DAYS=14
     volumes:
       - ./media_data:/app/media
 

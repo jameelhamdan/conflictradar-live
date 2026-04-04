@@ -1,6 +1,9 @@
+import logging
 from datetime import timedelta
 
 from django.contrib import admin, messages
+
+logger = logging.getLogger(__name__)
 from django.shortcuts import redirect
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
@@ -45,11 +48,54 @@ class SourceAdmin(ImportExportModelAdmin):
     list_display = ["code", "name", "type", "author_slug", "is_enabled", "created_on"]
     list_filter = ["type", "is_enabled"]
     search_fields = ["name", "code", "author_slug"]
+    actions = ["disable_source", "disable_and_skip_articles", "delete_source_and_articles"]
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return [*self.readonly_fields, "code"]
         return self.readonly_fields
+
+    @admin.action(description="Disable selected sources (stop fetching, keep all data)")
+    def disable_source(self, request, queryset):
+        updated = queryset.update(is_enabled=False)
+        for source in queryset:
+            logger.info("[admin] Disabled source %s", source.code)
+        self.message_user(request, f"Disabled {updated} source(s).", messages.SUCCESS)
+
+    @admin.action(description="Disable sources and skip their unprocessed articles")
+    def disable_and_skip_articles(self, request, queryset):
+        from django.utils.timezone import now
+        total_skipped = total_sources = 0
+        for source in queryset:
+            source.is_enabled = False
+            source.save(update_fields=["is_enabled"])
+            # Mark unprocessed articles as processed so they skip the pipeline
+            n = models.Article.objects.filter(
+                source_code=source.code, processed_on__isnull=True
+            ).update(processed_on=now())
+            total_skipped += n
+            total_sources += 1
+            logger.info("[admin] Disabled source %s, skipped %d unprocessed article(s)", source.code, n)
+        self.message_user(
+            request,
+            f"Disabled {total_sources} source(s), skipped {total_skipped} unprocessed article(s).",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Delete selected sources and ALL their articles (irreversible)")
+    def delete_source_and_articles(self, request, queryset):
+        total_articles = total_sources = 0
+        for source in queryset:
+            n, _ = models.Article.objects.filter(source_code=source.code).delete()
+            total_articles += n
+            source.delete()
+            total_sources += 1
+            logger.info("[admin] Deleted source %s and %d articles", source.code, n)
+        self.message_user(
+            request,
+            f"Deleted {total_sources} source(s) and {total_articles} article(s).",
+            messages.SUCCESS,
+        )
 
 
 @admin.register(models.Article)

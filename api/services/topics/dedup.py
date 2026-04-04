@@ -45,6 +45,15 @@ def semantic_merge_topics(topics: list[TopicDict], threshold: float = 0.85) -> l
             merged.append(cluster[0]._topic)
             continue
 
+        # Don't merge topics that are in a parent-child relationship — doing so
+        # would corrupt the tree by absorbing a parent into its child or vice versa.
+        cluster_slugs = {p._topic.get('slug') for p in cluster}
+        cluster_parents = {p._topic.get('parent') for p in cluster if p._topic.get('parent')}
+        if cluster_slugs & cluster_parents:
+            for proxy in cluster:
+                merged.append(proxy._topic)
+            continue
+
         # Canonical = entry with most keywords
         canonical: TopicDict = max(
             (p._topic for p in cluster),

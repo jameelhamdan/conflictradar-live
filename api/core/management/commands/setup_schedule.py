@@ -38,6 +38,7 @@ class Command(BaseCommand):
             discover_topics_task,
             fetch_articles_task,
             fetch_earthquakes_task,
+            purge_articles_task,
             fetch_forex_task,
             fetch_notams_task,
             fetch_prices_task,
@@ -71,11 +72,14 @@ class Command(BaseCommand):
         quake_interval = _minutes('EARTHQUAKE_FETCH_INTERVAL_MINUTES', '5')
         forex_interval = _minutes('FOREX_FETCH_INTERVAL_MINUTES', '15')
 
-        light.schedule(now, fetch_articles_task,    interval=fetch_interval, repeat=None, timeout=_interval_timeout(fetch_interval))
-        light.schedule(now, fetch_prices_task,      interval=price_interval, repeat=None, timeout=_interval_timeout(price_interval))
-        light.schedule(now, fetch_notams_task,      interval=notam_interval, repeat=None, timeout=_interval_timeout(notam_interval))
-        light.schedule(now, fetch_earthquakes_task, interval=quake_interval, repeat=None, timeout=_interval_timeout(quake_interval))
-        light.schedule(now, fetch_forex_task,       interval=forex_interval, repeat=None, timeout=_interval_timeout(forex_interval))
+        purge_interval = _minutes('PURGE_ARTICLES_INTERVAL_MINUTES', '360')
+
+        light.schedule(now, fetch_articles_task,    interval=fetch_interval,  repeat=None, timeout=_interval_timeout(fetch_interval))
+        light.schedule(now, fetch_prices_task,      interval=price_interval,  repeat=None, timeout=_interval_timeout(price_interval))
+        light.schedule(now, fetch_notams_task,      interval=notam_interval,  repeat=None, timeout=_interval_timeout(notam_interval))
+        light.schedule(now, fetch_earthquakes_task, interval=quake_interval,  repeat=None, timeout=_interval_timeout(quake_interval))
+        light.schedule(now, fetch_forex_task,       interval=forex_interval,  repeat=None, timeout=_interval_timeout(forex_interval))
+        light.schedule(now, purge_articles_task,    interval=purge_interval,  repeat=None, timeout=_interval_timeout(purge_interval))
 
         # ── Heavy queue — NLP / LLM (defaults are 5x the base interval) ───────
         process_interval  = _minutes('PROCESS_INTERVAL_MINUTES', '60')
@@ -99,5 +103,5 @@ class Command(BaseCommand):
         heavy.cron(f'0 {newsletter_hour} * * *', generate_newsletter_task, repeat=None, timeout=cron_timeout)
 
         self.stdout.write(self.style.SUCCESS(
-            'Schedule registered: 5 light interval jobs + 6 heavy interval jobs + 2 heavy cron jobs.'
+            'Schedule registered: 6 light interval jobs + 6 heavy interval jobs + 2 heavy cron jobs.'
         ))
