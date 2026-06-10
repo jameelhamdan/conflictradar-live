@@ -33,3 +33,4 @@ RUN mkdir -p /app/.static && chown -R djangouser . && chmod +x ./release.sh ./ma
 EXPOSE 8000
 
 USER djangouser
+ENTRYPOINT ["./release.sh"]
