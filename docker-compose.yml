@@ -18,7 +18,7 @@ services:
       - "192.168.2.17:80:80"
     volumes:
       - ./frontend_dist:/usr/share/nginx/html:ro
-      - ./.static:/django_static:ro
+      - static_data:/django_static:ro
       - ./nginx/templates:/etc/nginx/templates:ro
     depends_on:
       frontend:
@@ -39,7 +39,7 @@ services:
   api:
     build: ./api
     restart: always
-    command: ./release.sh uvicorn app.asgi:application --host 0.0.0.0 --port 8000 --workers 4
+    command: sh -c "./release.sh && uvicorn app.asgi:application --host 0.0.0.0 --port 8000 --workers 4"
     expose:
       - "8000"
     depends_on:
@@ -48,7 +48,7 @@ services:
     env_file: .env.app
     volumes:
       - ./media_data:/app/media
-      - ./.static:/app/.static
+      - static_data:/app/.static
 
   worker-heavy:
     build: ./api
@@ -100,3 +100,6 @@ services:
       resources:
         limits:
           memory: 1g
+
+volumes:
+  static_data:
