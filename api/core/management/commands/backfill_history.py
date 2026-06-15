@@ -20,22 +20,33 @@ Examples:
     python manage.py backfill_history my_rss_feed \\
         --start-date 2022-01-01 --end-date 2025-01-01 --resume
 
+    # Enqueue as a background RQ job (heavy queue, no timeout) — for long runs
+    python manage.py backfill_history my_rss_feed \\
+        --start-date 2022-01-01 --end-date 2025-01-01 --background
+
+    # Backfill ALL enabled RSS sources (omit the source code); --background works too
+    python manage.py backfill_history \\
+        --start-date 2022-01-01 --end-date 2025-01-01 --background
+
 After a backfill, process newly imported articles through the NLP pipeline:
     python manage.py process_articles --limit <N>
 """
 import datetime
 
-from django.core.management.base import BaseCommand
+from core.management.base import BaseTaskCommand
 
 
-class Command(BaseCommand):
+class Command(BaseTaskCommand):
     help = 'Backfill top-N historical articles per ISO week from a source'
 
     def add_arguments(self, parser):
         parser.add_argument(
             'source_code',
             type=str,
-            help='Source.code to backfill (must be of type rss)',
+            nargs='?',
+            default=None,
+            help='Source.code to backfill (must be of type rss). '
+                 'Omit to backfill all enabled RSS sources.',
         )
         parser.add_argument(
             '--start-date',
@@ -77,77 +88,93 @@ class Command(BaseCommand):
             action='store_true',
             help='Skip weeks already completed; checkpoint stored in Django cache',
         )
+        parser.add_argument(
+            '--background', action='store_true',
+            help='Enqueue as a background RQ task (heavy queue, no timeout) instead '
+                 'of running directly',
+        )
 
     def handle(self, *args, **kwargs):
         import core.models as m
-        from services.data.historical import (
-            HistoricalBackfillService,
-            HistoricalServiceError,
-            iter_weeks,
-        )
+        from services.data.historical import iter_weeks
+        from services.tasks import backfill_all_sources_task, backfill_history_task
 
-        source_code: str = kwargs['source_code']
+        source_code: str | None = kwargs['source_code']
         start_date = _parse_date(kwargs['start_date'])
         end_date = _parse_date(kwargs['end_date'])
         top_n: int = kwargs['top_n']
         delay: float = kwargs['delay']
         dry_run: bool = kwargs['dry_run']
         resume: bool = kwargs['resume']
+        all_sources = source_code is None
 
         if start_date >= end_date:
             self.stderr.write(self.style.ERROR('--start-date must be before --end-date.'))
             return
 
-        try:
-            source = m.Source.objects.get(code=source_code)
-        except m.Source.DoesNotExist:
-            self.stderr.write(self.style.ERROR(f'Source "{source_code}" not found.'))
+        if all_sources:
+            count = m.Source.objects.filter(
+                type=m.SourceType.RSS, is_enabled=True,
+            ).count()
+            if count == 0:
+                self.stderr.write(self.style.ERROR('No enabled RSS sources to backfill.'))
+                return
+        else:
+            try:
+                m.Source.objects.get(code=source_code)
+            except m.Source.DoesNotExist:
+                self.stderr.write(self.style.ERROR(f'Source "{source_code}" not found.'))
+                return
+
+        # ── Background: enqueue and return ────────────────────────────────────
+        if kwargs['background']:
+            if dry_run:
+                self.stderr.write(self.style.ERROR('--dry-run cannot be combined with --background.'))
+                return
+            from services.queue import enqueue
+            # No timeout (-1): multi-year / multi-source backfills outlast the 30-min cap.
+            if all_sources:
+                enqueue(
+                    backfill_all_sources_task,
+                    start_date, end_date,
+                    top_n=top_n, delay_seconds=delay, resume=resume,
+                    queue='heavy', job_timeout=-1,
+                )
+                label = f'all enabled RSS sources ({count})'
+                task_name = 'backfill_all_sources_task'
+            else:
+                enqueue(
+                    backfill_history_task,
+                    source_code, start_date, end_date,
+                    top_n=top_n, delay_seconds=delay, resume=resume,
+                    queue='heavy', job_timeout=-1,
+                )
+                label = f'"{source_code}"'
+                task_name = 'backfill_history_task'
+            self.stdout.write(self.style.SUCCESS(
+                f'Enqueued {task_name} for {label} '
+                f'({start_date.date()} → {end_date.date()}) on the heavy queue.'
+            ))
             return
 
+        # ── Foreground: run with per-week progress echoed to stdout ────────────
         total_weeks = sum(1 for _ in iter_weeks(start_date, end_date))
         dry_label = '  [DRY RUN — nothing will be written]' if dry_run else ''
 
-        self.stdout.write(
-            self.style.MIGRATE_HEADING(
-                f'\nBackfilling  {source.name}  ({source.type})\n'
-                f'  Range   : {start_date.date()} → {end_date.date()}\n'
-                f'  Weeks   : {total_weeks}\n'
-                f'  Top-N   : {top_n} per week\n'
-                f'  Delay   : {delay}s between weeks'
-                + dry_label
-            )
-        )
-
-        # Checkpoint — set of week_start ISO strings already completed
-        resume_weeks: set[str] = set()
-        checkpoint_key = (
-            f'backfill:{source_code}:{start_date.date()}:{end_date.date()}:done'
-        )
-        if resume:
-            from django.core.cache import cache
-            resume_weeks = cache.get(checkpoint_key) or set()
-            if resume_weeks:
-                self.stdout.write(
-                    f'  Resuming: {len(resume_weeks)} week(s) already done, skipping.\n'
+        def header(source):
+            self.stdout.write(
+                self.style.MIGRATE_HEADING(
+                    f'\nBackfilling  {source.name}  ({source.type})\n'
+                    f'  Range   : {start_date.date()} → {end_date.date()}\n'
+                    f'  Weeks   : {total_weeks}\n'
+                    f'  Top-N   : {top_n} per week\n'
+                    f'  Delay   : {delay}s between weeks'
+                    + dry_label
                 )
-
-        # Validate strategy before starting the loop
-        try:
-            service = HistoricalBackfillService(
-                source=source,
-                start_date=start_date,
-                end_date=end_date,
-                top_n=top_n,
-                delay_seconds=delay,
             )
-        except HistoricalServiceError as exc:
-            self.stderr.write(self.style.ERROR(str(exc)))
-            return
+            self.stdout.write('')
 
-        self.stdout.write('')
-        total_fetched = total_saved = 0
-
-        for result in service.run(resume_weeks=resume_weeks, dry_run=dry_run):
+        def progress(result):
             line = (
                 f'  {result.week_start.date()}  '
                 f'candidates={result.fetched:>4}  '
@@ -160,29 +187,36 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(line)
 
-            total_fetched += result.fetched
-            total_saved += result.saved
+        if all_sources:
+            summary = backfill_all_sources_task(
+                start_date, end_date,
+                top_n=top_n, delay_seconds=delay, dry_run=dry_run, resume=resume,
+                progress=progress, on_source_start=header,
+            )
+            scope = f'{summary["sources"]} source(s) | '
+        else:
+            header(m.Source.objects.get(code=source_code))
+            summary = backfill_history_task(
+                source_code, start_date, end_date,
+                top_n=top_n, delay_seconds=delay, dry_run=dry_run, resume=resume,
+                progress=progress,
+            )
+            scope = ''
 
-            if resume and not dry_run:
-                from django.core.cache import cache
-                resume_weeks.add(result.week_start.isoformat())
-                cache.set(checkpoint_key, resume_weeks, timeout=None)
-
-        # Summary
         self.stdout.write('')
-        summary = (
-            f'Done.  {total_weeks} weeks | '
-            f'{total_fetched} candidates | '
-            f'{total_saved} articles saved'
+        line = (
+            f'Done.  {scope}{summary["weeks"]} weeks | '
+            f'{summary["fetched"]} candidates | '
+            f'{summary["saved"]} articles saved'
         )
         if dry_run:
-            summary += '  (dry run — nothing written)'
-        self.stdout.write(self.style.SUCCESS(summary))
+            line += '  (dry run — nothing written)'
+        self.stdout.write(self.style.SUCCESS(line))
 
-        if not dry_run and total_saved > 0:
+        if not dry_run and summary['saved'] > 0:
             self.stdout.write(
                 '\n  New articles need NLP processing. Run:\n'
-                f'  python manage.py process_articles --limit {total_saved + 200}'
+                f'  python manage.py process_articles --limit {summary["saved"] + 200}'
             )
 
 

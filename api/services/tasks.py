@@ -135,6 +135,10 @@ def backfill_history_task(
     start_date: datetime,
     end_date: datetime,
     top_n: int = 10,
+    delay_seconds: float = 0.5,
+    dry_run: bool = False,
+    resume: bool = False,
+    progress=None,
 ) -> dict:
     """
     Backfill top-N articles per ISO week for a source.
@@ -142,10 +146,24 @@ def backfill_history_task(
     Enqueue with job_timeout=-1 (no cap) since multi-year backtracks can take
     longer than the standard 30-minute task timeout.
 
+    ``start_date`` / ``end_date`` accept either ``datetime`` objects or
+    ``YYYY-MM-DD`` strings (the latter so the task is trivially enqueueable).
+    ``resume`` skips ISO weeks already recorded in the Django cache checkpoint;
+    ``progress`` is an optional ``callable(WeekResult)`` invoked per week (the
+    management command passes one to echo per-week lines to stdout).
+
     Returns {'weeks': int, 'fetched': int, 'saved': int}.
     """
+    import logging
+
     import core.models as m
+    from django.core.cache import cache
     from services.data.historical import HistoricalBackfillService
+
+    logger = logging.getLogger(__name__)
+
+    start_date = _parse_backfill_date(start_date)
+    end_date = _parse_backfill_date(end_date)
 
     source = m.Source.objects.get(code=source_code)
     service = HistoricalBackfillService(
@@ -153,13 +171,89 @@ def backfill_history_task(
         start_date=start_date,
         end_date=end_date,
         top_n=top_n,
-        delay_seconds=0.5,
+        delay_seconds=delay_seconds,
     )
 
+    checkpoint_key = f'backfill:{source_code}:{start_date.date()}:{end_date.date()}:done'
+    resume_weeks: set[str] = (cache.get(checkpoint_key) or set()) if resume else set()
+
     total_weeks = total_fetched = total_saved = 0
-    for result in service.run():
+    for result in service.run(resume_weeks=resume_weeks, dry_run=dry_run):
         total_weeks += 1
         total_fetched += result.fetched
         total_saved += result.saved
+        if progress is not None:
+            progress(result)
+        if resume and not dry_run:
+            resume_weeks.add(result.week_start.isoformat())
+            cache.set(checkpoint_key, resume_weeks, timeout=None)
 
-    return {'weeks': total_weeks, 'fetched': total_fetched, 'saved': total_saved}
+    summary = {'weeks': total_weeks, 'fetched': total_fetched, 'saved': total_saved}
+    logger.info('backfill_history_task %s done: %s', source_code, summary)
+    return summary
+
+
+def backfill_all_sources_task(
+    start_date: datetime,
+    end_date: datetime,
+    top_n: int = 10,
+    delay_seconds: float = 0.5,
+    dry_run: bool = False,
+    resume: bool = False,
+    progress=None,
+    on_source_start=None,
+) -> dict:
+    """
+    Backfill every enabled RSS source over the same date range, sequentially.
+
+    Only ``SourceType.RSS`` sources are eligible (the historical backfill has no
+    strategy for other types); disabled sources are skipped. Running sources one
+    at a time keeps API rate-limit pressure bounded. ``on_source_start`` is an
+    optional ``callable(Source)`` invoked before each source; ``progress`` is
+    forwarded per week to :func:`backfill_history_task`.
+
+    Enqueue with job_timeout=-1 — backfilling many sources can run for hours.
+
+    Returns {'sources': int, 'weeks': int, 'fetched': int, 'saved': int,
+             'per_source': {code: {weeks, fetched, saved}}}.
+    """
+    import logging
+
+    import core.models as m
+
+    logger = logging.getLogger(__name__)
+
+    start_date = _parse_backfill_date(start_date)
+    end_date = _parse_backfill_date(end_date)
+
+    sources = list(
+        m.Source.objects.filter(type=m.SourceType.RSS, is_enabled=True).order_by('code')
+    )
+
+    totals = {'sources': 0, 'weeks': 0, 'fetched': 0, 'saved': 0, 'per_source': {}}
+    for source in sources:
+        if on_source_start is not None:
+            on_source_start(source)
+        summary = backfill_history_task(
+            source.code, start_date, end_date,
+            top_n=top_n, delay_seconds=delay_seconds, dry_run=dry_run, resume=resume,
+            progress=progress,
+        )
+        totals['per_source'][source.code] = summary
+        totals['sources'] += 1
+        for key in ('weeks', 'fetched', 'saved'):
+            totals[key] += summary[key]
+
+    logger.info(
+        'backfill_all_sources_task done: %s source(s), %s saved',
+        totals['sources'], totals['saved'],
+    )
+    return totals
+
+
+def _parse_backfill_date(value) -> datetime:
+    """Normalize a backfill bound to a UTC datetime (accepts YYYY-MM-DD strings)."""
+    if isinstance(value, datetime):
+        return value
+    d = datetime.strptime(value, '%Y-%m-%d')
+    return d.replace(tzinfo=dt_timezone.utc)
