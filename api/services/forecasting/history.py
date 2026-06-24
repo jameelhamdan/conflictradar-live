@@ -13,29 +13,13 @@ from datetime import datetime, timezone
 
 import requests
 
-from .routing import PANEL_SYMBOLS
+from services.market_symbols import (
+    get_backfill_symbols,
+    get_coingecko_ids,
+    get_symbol_meta,
+)
 
 logger = logging.getLogger(__name__)
-
-# Panel symbol → (stream_key, display name). Mirrors services/streams/prices.py.
-SYMBOL_META: dict[str, tuple[str, str]] = {
-    'GC=F': ('commodity', 'Gold'),
-    'CL=F': ('commodity', 'Crude Oil'),
-    'NG=F': ('commodity', 'Natural Gas'),
-    'ZW=F': ('commodity', 'Wheat'),
-    'DX-Y.NYB': ('index', 'US Dollar Index'),
-    '^TNX': ('bond', 'US 10Y Treasury'),
-    '^VIX': ('index', 'Volatility Index'),
-    'SPY': ('stock', 'S&P 500 ETF'),
-    'BTC-USD': ('crypto', 'Bitcoin'),
-    'ETH-USD': ('crypto', 'Ethereum'),
-}
-
-# Panel crypto → CoinGecko id.
-COINGECKO_IDS: dict[str, str] = {
-    'BTC-USD': 'bitcoin',
-    'ETH-USD': 'ethereum',
-}
 
 _HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; happinga-meter/1.0)'}
 
@@ -50,7 +34,7 @@ def _day_anchor(dt: datetime) -> datetime:
 
 def fetch_daily_bars(symbol: str, years: int = 5) -> list[dict]:
     """Return a list of OHLC dicts for ``symbol`` going back ``years``. Empty on failure."""
-    if symbol in COINGECKO_IDS:
+    if symbol in get_coingecko_ids():
         return _fetch_coingecko(symbol, years)
     return _fetch_yfinance(symbol, years)
 
@@ -62,7 +46,7 @@ def _fetch_yfinance(symbol: str, years: int) -> list[dict]:
         logger.error('[history] yfinance not installed — cannot backfill %s', symbol)
         return []
 
-    stream_key, name = SYMBOL_META.get(symbol, ('stock', symbol))
+    stream_key, name = get_symbol_meta().get(symbol, ('stock', symbol))
     period = f'{max(years, 1)}y'
     try:
         df = yf.Ticker(symbol).history(period=period, interval='1d', auto_adjust=False)
@@ -90,8 +74,8 @@ def _fetch_yfinance(symbol: str, years: int) -> list[dict]:
 
 
 def _fetch_coingecko(symbol: str, years: int) -> list[dict]:
-    cg_id = COINGECKO_IDS[symbol]
-    stream_key, name = SYMBOL_META.get(symbol, ('crypto', symbol))
+    cg_id = get_coingecko_ids()[symbol]
+    stream_key, name = get_symbol_meta().get(symbol, ('crypto', symbol))
     days = min(max(years * 365, 1), 3650)
     url = f'https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart'
     params = {'vs_currency': 'usd', 'days': str(days), 'interval': 'daily'}
@@ -149,6 +133,6 @@ def backfill_symbol(symbol: str, years: int = 5, dry_run: bool = False) -> int:
 
 
 def backfill_all(symbols: list[str] | None = None, years: int = 5, dry_run: bool = False) -> dict[str, int]:
-    """Backfill every panel symbol (or a given subset). Returns {symbol: inserted}."""
-    symbols = symbols or list(PANEL_SYMBOLS)
+    """Backfill every active symbol (or a given subset). Returns {symbol: inserted}."""
+    symbols = symbols or get_backfill_symbols()
     return {s: backfill_symbol(s, years, dry_run) for s in symbols}

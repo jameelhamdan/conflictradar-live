@@ -14,7 +14,7 @@ import logging
 import re
 
 from services.forecasting.routing import (
-    PANEL_SYMBOLS,
+    get_panel_symbols,
     route_event_to_weighted_symbols,
 )
 
@@ -24,9 +24,8 @@ _PANEL_DESC = {
     'GC=F': 'Gold (safe-haven)', 'CL=F': 'Crude oil', 'NG=F': 'Natural gas',
     'ZW=F': 'Wheat', 'DX-Y.NYB': 'US Dollar index', '^TNX': 'US 10Y yield',
     '^VIX': 'Volatility/fear index', 'SPY': 'S&P 500 equities',
-    'BTC-USD': 'Bitcoin', 'ETH-USD': 'Ethereum',
+    'BTC-USD': 'Bitcoin', 'ETH-USD': 'Ethereum', 'EURUSD=X': 'EUR/USD',
 }
-_PANEL_SET = set(PANEL_SYMBOLS)
 
 
 def _event_sentiment(event) -> float | None:
@@ -62,7 +61,9 @@ class LLMEventRouter:
             logger.warning('[router] no LLM available (%s) — using deterministic fallback', exc)
             return {str(e.pk): _fallback(e) for e in events}
 
-        panel_lines = '\n'.join(f'- {s}: {_PANEL_DESC.get(s, s)}' for s in PANEL_SYMBOLS)
+        panel = get_panel_symbols()
+        panel_set = set(panel)
+        panel_lines = '\n'.join(f'- {s}: {_PANEL_DESC.get(s, s)}' for s in panel)
         total = (len(events) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
 
         for start in range(0, len(events), self.BATCH_SIZE):
@@ -104,7 +105,7 @@ class LLMEventRouter:
                 for event in batch:
                     key = str(event.pk)
                     raw = parsed.get(key)
-                    cleaned = self._clean(raw)
+                    cleaned = self._clean(raw, panel_set)
                     # Empty/garbage → deterministic fallback so the event still gets routed.
                     results[key] = cleaned if cleaned else _fallback(event)
             except Exception as exc:  # noqa: BLE001 — broad: any failure falls back
@@ -115,7 +116,7 @@ class LLMEventRouter:
         return results
 
     @staticmethod
-    def _clean(raw) -> list[dict]:
+    def _clean(raw, panel_set: set[str]) -> list[dict]:
         if not isinstance(raw, list):
             return []
         out: list[dict] = []
@@ -124,7 +125,7 @@ class LLMEventRouter:
             if not isinstance(item, dict):
                 continue
             sym = item.get('symbol')
-            if sym not in _PANEL_SET or sym in seen:
+            if sym not in panel_set or sym in seen:
                 continue
             try:
                 w = float(item.get('weight'))
@@ -151,10 +152,15 @@ def route_events(events: list, source: str = 'llm') -> int:
     else:
         routed = {str(e.pk): _fallback(e) for e in events}
 
+    from services.stages import mark_stage
+
     updated = 0
     for event in events:
-        event.affected_indicators = routed.get(str(event.pk), [])
+        indicators = routed.get(str(event.pk), [])
+        event.affected_indicators = indicators
         event.router_source = source
-        event.save(update_fields=['affected_indicators', 'router_source', 'updated_on'])
+        mark_stage(event, 'route', ok=bool(indicators),
+                   error=None if indicators else 'no indicators emitted')
+        event.save(update_fields=['affected_indicators', 'router_source', 'stage_status', 'updated_on'])
         updated += 1
     return updated

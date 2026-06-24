@@ -5,6 +5,7 @@ from api.views.events import (
     NotamZoneListView, NotamHistoryView,
     EarthquakeListView, StaticPointListView,
     TopicListView, TopicDetailView, TopicEventsView,
+    SymbolListView,
     SSEStreamView,
 )
 from api.views.newsletter import (
@@ -33,6 +34,9 @@ urlpatterns = [
 
     # ── Static reference points ───────────────────────────────────────────────
     path('static-points/', StaticPointListView.as_view(), name='static-point-list'),
+
+    # ── Market symbols (curated MarketSymbol panel) ───────────────────────────
+    path('symbols/', SymbolListView.as_view(), name='symbol-list'),
 
     # ── Current global topics ─────────────────────────────────────────────────
     path('topics/', TopicListView.as_view(), name='topic-list'),

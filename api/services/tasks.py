@@ -14,6 +14,16 @@ DEFAULT_PROCESS_LIMIT = int(os.getenv("PROCESS_LIMIT", "1000"))
 DEFAULT_AGGREGATE_HOURS = int(os.getenv("AGGREGATE_HOURS", "24"))
 DEFAULT_AGGREGATE_MIN_ARTICLES = int(os.getenv("AGGREGATE_MIN_ARTICLES", "1"))
 
+# Fan-out tuning (WA3) — dispatchers cap how many records they enqueue per tick so a
+# cold start doesn't flood the queue; chunk size amortizes enqueue overhead.
+PROCESS_CHUNK_SIZE = int(os.getenv("PROCESS_CHUNK_SIZE", "1"))
+PROCESS_DISPATCH_LIMIT = int(os.getenv("PROCESS_DISPATCH_LIMIT", "500"))
+TAG_DISPATCH_LIMIT = int(os.getenv("TAG_DISPATCH_LIMIT", "500"))
+ROUTE_DISPATCH_LIMIT = int(os.getenv("ROUTE_DISPATCH_LIMIT", "500"))
+TAG_CHUNK_SIZE = 10  # one LLM call per chunk (LLMTopicMatcher.BATCH_SIZE)
+ROUTE_CHUNK_SIZE = 10
+BOOTSTRAP_ARTICLE_YEARS = int(os.getenv("BOOTSTRAP_ARTICLE_YEARS", "1"))
+
 
 # ── Text pipeline ─────────────────────────────────────────────────────────────
 
@@ -69,6 +79,179 @@ def run_pipeline_task(
     if tag:
         summary['tagged'] = tag_topics_task(hours=aggregate_hours)
     return summary
+
+
+# ── Fan-out: dispatcher → per-record worker (WA3) ────────────────────────────────
+# A light dispatcher (default queue) selects pending records and enqueues one worker
+# job per record/chunk so the queue spreads work across all workers. Workers are
+# idempotent. Downstream steps run on their own schedule (eventually-consistent) —
+# the deterministic admin "Run full pipeline" path stays in run_pipeline_task.
+
+def fetch_source_task(source_code: str, start_date: datetime | None = None) -> int:
+    """Fetch one source. Idempotent per source (RSS de-dupes on save)."""
+    now = datetime.now(dt_timezone.utc)
+    if start_date is None:
+        start_date = now - timedelta(minutes=DEFAULT_FETCH_MINUTES)
+    return Workflow.fetch_articles(source_code, start_date)
+
+
+def dispatch_fetch_task(start_date: datetime | None = None) -> int:
+    """Enqueue one fetch_source_task per enabled source. Returns sources dispatched."""
+    from core import models as core_models
+    from services.queue import enqueue, make_retry
+
+    now = datetime.now(dt_timezone.utc)
+    if start_date is None:
+        start_date = now - timedelta(minutes=DEFAULT_FETCH_MINUTES)
+    codes = list(core_models.Source.objects.filter(is_enabled=True).values_list('code', flat=True))
+    retry = make_retry()
+    for code in codes:
+        enqueue(fetch_source_task, code, start_date, queue='default', retry=retry)
+    return len(codes)
+
+
+def process_articles_chunk_task(ids: list, only_failed: bool = False) -> int:
+    """Process a chunk of articles by id (idempotent)."""
+    return Workflow.process_articles(ids=ids, only_failed=only_failed)
+
+
+def process_article_task(article_id, only_failed: bool = False) -> int:
+    """Process a single article by id (idempotent)."""
+    return Workflow.process_articles(ids=[article_id], only_failed=only_failed)
+
+
+def dispatch_process_articles_task(limit: int | None = None, only_failed: bool = False,
+                                   chunk_size: int | None = None) -> int:
+    """Select unprocessed (or un-located) articles and fan them out. Returns jobs enqueued."""
+    from core import models as core_models
+    from services.queue import enqueue, make_retry
+
+    limit = limit or PROCESS_DISPATCH_LIMIT
+    chunk_size = max(1, chunk_size or PROCESS_CHUNK_SIZE)
+    if only_failed:
+        qs = core_models.Article.objects.filter(processed_on__isnull=False, location__isnull=True)
+        ids = [a.id for a in qs.only('id', 'extra_data') if not (a.extra_data or {}).get('geo_failed')][:limit]
+    else:
+        ids = list(core_models.Article.objects.filter(processed_on__isnull=True)
+                   .values_list('id', flat=True)[:limit])
+    if not ids:
+        return 0
+    retry = make_retry()
+    enq = 0
+    for i in range(0, len(ids), chunk_size):
+        chunk = ids[i:i + chunk_size]
+        if len(chunk) == 1:
+            enqueue(process_article_task, chunk[0], only_failed, queue='heavy', retry=retry)
+        else:
+            enqueue(process_articles_chunk_task, chunk, only_failed, queue='heavy', retry=retry)
+        enq += 1
+    return enq
+
+
+def tag_events_chunk_task(event_ids: list) -> int:
+    """Tag a chunk of events by id (one LLM call). Idempotent."""
+    return Workflow.tag_events_by_ids(event_ids)
+
+
+def dispatch_tag_topics_task(hours: int = DEFAULT_AGGREGATE_HOURS, force_retag: bool = False,
+                             limit: int | None = None) -> int:
+    """Select events needing tags and fan them out in chunks of 10. Returns jobs enqueued."""
+    from core import models as core_models
+    from services.queue import enqueue, make_retry
+    from services.workflow import _needs_tagging
+
+    limit = limit or TAG_DISPATCH_LIMIT
+    lookback = datetime.now(dt_timezone.utc) - timedelta(hours=hours)
+    events = list(core_models.Event.objects.filter(started_at__gte=lookback))
+    if not force_retag:
+        events = [e for e in events if _needs_tagging(e.topics) or e.topics_source == 'keyword']
+    ids = [e.pk for e in events][:limit]
+    if not ids:
+        return 0
+    retry = make_retry()
+    enq = 0
+    for i in range(0, len(ids), TAG_CHUNK_SIZE):
+        enqueue(tag_events_chunk_task, ids[i:i + TAG_CHUNK_SIZE], queue='heavy', retry=retry)
+        enq += 1
+    return enq
+
+
+def route_events_chunk_task(event_ids: list, source: str | None = None) -> int:
+    """Route a chunk of events by id. Idempotent."""
+    from django.conf import settings
+    from core import models as core_models
+    from services.routing import route_events
+
+    src = source or settings.FORECAST_ROUTER
+    events = list(core_models.Event.objects.filter(pk__in=list(event_ids)))
+    return route_events(events, source=src)
+
+
+def dispatch_route_events_task(hours: int = 168, source: str | None = None,
+                               limit: int | None = None) -> int:
+    """Select recent events and fan out routing in chunks of 10. Returns jobs enqueued."""
+    from core import models as core_models
+    from services.queue import enqueue, make_retry
+
+    limit = limit or ROUTE_DISPATCH_LIMIT
+    start = datetime.now(dt_timezone.utc) - timedelta(hours=hours)
+    ids = list(core_models.Event.objects.filter(started_at__gte=start)
+               .values_list('pk', flat=True)[:limit])
+    if not ids:
+        return 0
+    retry = make_retry()
+    enq = 0
+    for i in range(0, len(ids), ROUTE_CHUNK_SIZE):
+        enqueue(route_events_chunk_task, ids[i:i + ROUTE_CHUNK_SIZE], source, queue='heavy', retry=retry)
+        enq += 1
+    return enq
+
+
+# ── Configurationless first-load bootstrap (WA4) ─────────────────────────────────
+
+def bootstrap_initial_data_task(force: bool = False) -> int:
+    """One-time, idempotent first-load backfill so deployment is configurationless.
+
+    Enqueues full price history + top-10/week article backfill for every enabled RSS
+    source, then trains/runs the forecast. Guarded by a persisted cache flag and a
+    PriceBar-presence heuristic so it runs exactly once. Triggered from setup_schedule.
+    """
+    import logging
+    from django.core.cache import cache
+    from django.conf import settings
+    from core import models as core_models
+    from services.queue import enqueue, make_retry
+
+    log = logging.getLogger(__name__)
+    FLAG = 'bootstrap:initial_data:done'
+    if not force:
+        if cache.get(FLAG):
+            return 0
+        if core_models.PriceBar.objects.exists():
+            cache.set(FLAG, True, timeout=None)
+            return 0
+
+    retry = make_retry()
+    now = datetime.now(dt_timezone.utc)
+    start = now - timedelta(days=365 * BOOTSTRAP_ARTICLE_YEARS)
+
+    enqueue(backfill_prices_task, years=5, queue='default', job_timeout=-1, retry=retry)
+    enqueue(backfill_all_sources_task, start, now, 10, queue='heavy', job_timeout=-1, retry=retry)
+    if settings.FORECAST_ENABLED:
+        enqueue(train_forecast_model_task, queue='heavy', job_timeout=-1)
+        enqueue(run_forecast_task, queue='heavy', job_timeout=-1)
+
+    cache.set(FLAG, True, timeout=None)
+    log.info('[bootstrap] initial data backfill enqueued (article window %dy)', BOOTSTRAP_ARTICLE_YEARS)
+    return 1
+
+
+def backfill_articles_task(top_n: int = 10, days: int = 14) -> dict:
+    """Rolling recent-window article backfill (top-N/week) across all enabled RSS sources.
+    Scheduled weekly so article history stays filled without manual action (WA4)."""
+    now = datetime.now(dt_timezone.utc)
+    start = now - timedelta(days=days)
+    return backfill_all_sources_task(start, now, top_n=top_n)
 
 
 # ── Topic tasks ────────────────────────────────────────────────────────────────
@@ -351,18 +534,19 @@ def run_forecast_task() -> int:
     if not settings.FORECAST_ENABLED:
         return 0
     from services.forecasting import features, model
-    from services.forecasting.history import SYMBOL_META
+    from services.market_symbols import get_symbol_meta
     from core import models as core_models
 
     fm = features.build_feature_matrix(include_events=True)
     if fm.empty:
         return 0
+    symbol_meta = get_symbol_meta()
     now = datetime.now(dt_timezone.utc)
     router = settings.FORECAST_ROUTER
     created = 0
     for h in settings.FORECAST_HORIZONS_DAYS:
         for p in model.predict(fm, h):
-            stream_key = SYMBOL_META.get(p['symbol'], ('', ''))[0]
+            stream_key = symbol_meta.get(p['symbol'], ('', ''))[0]
             core_models.Forecast.objects.create(
                 symbol=p['symbol'], stream_key=stream_key, generated_at=now,
                 as_of_date=p['as_of_date'], horizon_days=h, direction=p['direction'],

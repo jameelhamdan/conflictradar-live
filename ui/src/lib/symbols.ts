@@ -11,7 +11,10 @@ const SYMBOL_STREAM_KEY: Record<string, StreamKey> = {
   "^VIX": "index",
   "DX-Y.NYB": "index",
   "^TNX": "bond",
+  "^TYX": "bond",
   "SPY": "stock",
+  "QQQ": "stock",
+  "EURUSD=X": "forex",
   "BTC-USD": "crypto",
   "ETH-USD": "crypto",
 }

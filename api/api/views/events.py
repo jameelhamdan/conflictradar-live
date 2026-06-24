@@ -26,7 +26,7 @@ from api.serializers import (
     ArticleSerializer, EventSerializer, SourceSerializer,
     PriceTickSerializer, PriceBarSerializer, NotamZoneSerializer, NotamRecordSerializer,
     EarthquakeRecordSerializer, StaticPointSerializer,
-    TopicSerializer,
+    TopicSerializer, MarketSymbolSerializer,
 )
 
 
@@ -280,6 +280,32 @@ class StaticPointListView(APIView):
             qs = qs.filter(country_code__iexact=country_code)
 
         serializer = StaticPointSerializer(qs, many=True)
+        return Response({'results': serializer.data, 'count': len(serializer.data)})
+
+
+class SymbolListView(APIView):
+    """GET /api/symbols/ — the curated MarketSymbol panel.
+
+    Query params: group, stream_key, forecast (true/false), popular (true/false),
+    active (true default / false / all).
+    """
+
+    def get(self, request):
+        qs = core_models.MarketSymbol.objects.all()
+        active = (request.query_params.get('active') or 'true').lower()
+        if active == 'true':
+            qs = qs.filter(is_active=True)
+        elif active == 'false':
+            qs = qs.filter(is_active=False)
+        if group := request.query_params.get('group'):
+            qs = qs.filter(group=group)
+        if stream_key := request.query_params.get('stream_key'):
+            qs = qs.filter(stream_key=stream_key)
+        if (forecast := request.query_params.get('forecast')) is not None:
+            qs = qs.filter(is_forecast=(forecast.lower() == 'true'))
+        if (popular := request.query_params.get('popular')) is not None:
+            qs = qs.filter(is_popular=(popular.lower() == 'true'))
+        serializer = MarketSymbolSerializer(qs, many=True)
         return Response({'results': serializer.data, 'count': len(serializer.data)})
 
 

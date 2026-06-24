@@ -34,24 +34,29 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from newsletter.tasks import generate_newsletter_task
+        from services.queue import enqueue
         from services.tasks import (
             aggregate_events_task,
+            backfill_articles_task,
             backfill_prices_task,
+            bootstrap_initial_data_task,
             discover_topics_task,
-            fetch_articles_task,
+            dispatch_fetch_task,
+            dispatch_process_articles_task,
+            dispatch_route_events_task,
+            dispatch_tag_topics_task,
             fetch_earthquakes_task,
             fetch_forex_task,
             fetch_notams_task,
             fetch_prices_task,
             pipeline_health_task,
-            process_articles_task,
             refresh_topics_task,
-            route_events_task,
             run_forecast_task,
             score_forecasts_task,
-            tag_topics_task,
             train_forecast_model_task,
         )
+
+        from services.queue import _execute_tracked
 
         conn = django_rq.get_connection('default')
         light = Scheduler(queue_name='default', connection=conn)
@@ -59,6 +64,18 @@ class Command(BaseCommand):
 
         # Used only for cron (daily) jobs where no interval gives a natural bound.
         cron_timeout = int(os.getenv('JOB_TIMEOUT_SECONDS', '1800'))
+
+        # Schedule helpers that route the job through _execute_tracked so every
+        # scheduled run is recorded as a TaskRun (feeds the ops dashboard, WA5).
+        def sched(scheduler, when, func, queue_name, *, interval=None, repeat=None,
+                  timeout=None, kwargs=None):
+            scheduler.schedule(when, _execute_tracked,
+                               args=[func, (), kwargs or {}, queue_name],
+                               interval=interval, repeat=repeat, timeout=timeout)
+
+        def cron(scheduler, cron_string, func, queue_name, *, repeat=None, timeout=None):
+            scheduler.cron(cron_string, _execute_tracked,
+                           args=[func, (), {}, queue_name], repeat=repeat, timeout=timeout)
 
         # Clear existing scheduled jobs so re-runs are idempotent
         for job in light.get_jobs():
@@ -76,52 +93,71 @@ class Command(BaseCommand):
         quake_interval = _minutes('EARTHQUAKE_FETCH_INTERVAL_MINUTES', '5')
         forex_interval = _minutes('FOREX_FETCH_INTERVAL_MINUTES', '15')
 
-        light.schedule(now, fetch_articles_task,    interval=fetch_interval, repeat=None, timeout=_interval_timeout(fetch_interval))
+        # Fetch is a light dispatcher: enqueues one fetch_source_task per enabled source (WA3).
+        sched(light, now, dispatch_fetch_task, 'default', interval=fetch_interval, timeout=_interval_timeout(fetch_interval))
         # Stream collectors — each gated by its A4 feature flag.
         if settings.STREAM_PRICES_ENABLED:
-            light.schedule(now, fetch_prices_task,      interval=price_interval, repeat=None, timeout=_interval_timeout(price_interval))
+            sched(light, now, fetch_prices_task,      'default', interval=price_interval, timeout=_interval_timeout(price_interval))
         if settings.STREAM_NOTAM_ENABLED:
-            light.schedule(now, fetch_notams_task,      interval=notam_interval, repeat=None, timeout=_interval_timeout(notam_interval))
+            sched(light, now, fetch_notams_task,      'default', interval=notam_interval, timeout=_interval_timeout(notam_interval))
         if settings.STREAM_EARTHQUAKE_ENABLED:
-            light.schedule(now, fetch_earthquakes_task, interval=quake_interval, repeat=None, timeout=_interval_timeout(quake_interval))
+            sched(light, now, fetch_earthquakes_task, 'default', interval=quake_interval, timeout=_interval_timeout(quake_interval))
         if settings.STREAM_FOREX_ENABLED:
-            light.schedule(now, fetch_forex_task,       interval=forex_interval, repeat=None, timeout=_interval_timeout(forex_interval))
+            sched(light, now, fetch_forex_task,       'default', interval=forex_interval, timeout=_interval_timeout(forex_interval))
         # Pipeline health monitor (A1/A5) — logs warnings on stale outputs.
         health_interval = _minutes('HEALTH_CHECK_INTERVAL_MINUTES', '30')
-        light.schedule(now, pipeline_health_task, interval=health_interval, repeat=None, timeout=_interval_timeout(health_interval))
+        sched(light, now, pipeline_health_task, 'default', interval=health_interval, timeout=_interval_timeout(health_interval))
 
-        # ── Heavy queue — NLP / LLM (defaults are 5x the base interval) ───────
+        # ── NLP / LLM — light dispatchers fan out to per-record heavy workers (WA3) ──
+        # Dispatchers are cheap (select + enqueue) so they sit on the light queue; the
+        # per-record workers they enqueue run on the heavy queue.
         process_interval  = _minutes('PROCESS_INTERVAL_MINUTES', '60')
         aggregate_interval = _minutes('AGGREGATE_INTERVAL_MINUTES', '60')
         tag_interval      = _minutes('TAG_TOPICS_INTERVAL_MINUTES', '75')
         discover_interval = _minutes('DISCOVER_TOPICS_INTERVAL_MINUTES', '150')
+        recover_interval  = _minutes('STUCK_RECOVERY_INTERVAL_MINUTES', '360')
 
-        heavy.schedule(now, process_articles_task,  interval=process_interval,   repeat=None, timeout=_interval_timeout(process_interval))
-        heavy.schedule(now, aggregate_events_task,  interval=aggregate_interval, repeat=None, timeout=_interval_timeout(aggregate_interval))
-        heavy.schedule(now, tag_topics_task,        interval=tag_interval,       repeat=None, timeout=_interval_timeout(tag_interval))
-        heavy.schedule(now, discover_topics_task,   interval=discover_interval,  repeat=None, timeout=_interval_timeout(discover_interval))
+        sched(light, now, dispatch_process_articles_task, 'default', interval=process_interval, timeout=_interval_timeout(process_interval))
+        sched(heavy, now, aggregate_events_task,  'heavy', interval=aggregate_interval, timeout=_interval_timeout(aggregate_interval))
+        sched(light, now, dispatch_tag_topics_task,       'default', interval=tag_interval,   timeout=_interval_timeout(tag_interval))
+        sched(heavy, now, discover_topics_task,   'heavy', interval=discover_interval,  timeout=_interval_timeout(discover_interval))
+        # Stuck-article recovery safety net: re-dispatch processed-but-unlocated articles (WA3.5).
+        sched(light, now, dispatch_process_articles_task, 'default', kwargs={'only_failed': True},
+              interval=recover_interval, timeout=_interval_timeout(recover_interval))
 
         # ── Cron jobs (heavy — daily LLM runs) ────────────────────────────────
         refresh_hour    = int(os.getenv('TOPICS_REFRESH_HOUR', '4'))
         newsletter_hour = int(os.getenv('NEWSLETTER_GENERATE_HOUR', '6'))
-        heavy.cron(f'0 {refresh_hour} * * *',    refresh_topics_task,      repeat=None, timeout=cron_timeout)
+        cron(heavy, f'0 {refresh_hour} * * *',    refresh_topics_task,      'heavy', timeout=cron_timeout)
         if settings.NEWSLETTER_ENABLED:
-            heavy.cron(f'0 {newsletter_hour} * * *', generate_newsletter_task, repeat=None, timeout=cron_timeout)
+            cron(heavy, f'0 {newsletter_hour} * * *', generate_newsletter_task, 'heavy', timeout=cron_timeout)
 
         # ── Forecasting (event-fused symbol prediction) ───────────────────────
+        # Weekly rolling article backfill (top-10/week recent window) keeps history filled (WA4).
+        week = 7 * 24 * 60 * 60
+        sched(heavy, now, backfill_articles_task, 'heavy', interval=week, timeout=cron_timeout)
+
         if settings.FORECAST_ENABLED:
             # Weekly OHLC backfill keeps PriceBar fresh (light I/O).
-            week = 7 * 24 * 60 * 60
-            light.schedule(now, backfill_prices_task, interval=week, repeat=None, timeout=cron_timeout)
-            # Route new events to symbols (LLM) on the heavy queue, aligned with tagging.
+            sched(light, now, backfill_prices_task, 'default', interval=week, timeout=cron_timeout)
+            # Route new events to symbols — light dispatcher → per-chunk heavy workers.
             route_interval = _minutes('ROUTE_EVENTS_INTERVAL_MINUTES', '90')
-            heavy.schedule(now, route_events_task, interval=route_interval, repeat=None,
-                           timeout=_interval_timeout(route_interval))
+            sched(light, now, dispatch_route_events_task, 'default', interval=route_interval,
+                  timeout=_interval_timeout(route_interval))
             # Daily: train models (05:00), generate forecasts (05:30), score elapsed (07:00).
             train_hour = int(os.getenv('FORECAST_TRAIN_HOUR', '5'))
-            heavy.cron(f'0 {train_hour} * * *',  train_forecast_model_task, repeat=None, timeout=cron_timeout)
-            heavy.cron(f'30 {train_hour} * * *', run_forecast_task,         repeat=None, timeout=cron_timeout)
-            light.cron('0 7 * * *',              score_forecasts_task,      repeat=None, timeout=cron_timeout)
+            cron(heavy, f'0 {train_hour} * * *',  train_forecast_model_task, 'heavy', timeout=cron_timeout)
+            cron(heavy, f'30 {train_hour} * * *', run_forecast_task,         'heavy', timeout=cron_timeout)
+            cron(light, '0 7 * * *',              score_forecasts_task,      'default', timeout=cron_timeout)
+
+        # ── Configurationless first-load bootstrap (WA4) ──────────────────────
+        # Enqueue once on every scheduler start; the task is idempotent (cache flag +
+        # PriceBar-presence heuristic) so it only backfills on a fresh deployment.
+        try:
+            enqueue(bootstrap_initial_data_task, queue='default')
+            self.stdout.write('Triggered first-load bootstrap (idempotent).')
+        except Exception as exc:  # noqa: BLE001 — never block schedule registration
+            self.stdout.write(self.style.WARNING(f'Bootstrap trigger skipped: {exc}'))
 
         # rq-scheduler keeps a single shared job registry (not split per queue),
         # so report the total actually registered.

@@ -5,10 +5,12 @@ import type {
   NotamZonesResponse,
   EarthquakesResponse,
   StaticPointsResponse,
+  SymbolsResponse,
   ForecastsResponse,
   ForecastAccuracyResponse,
   StreamKey,
   StaticPointType,
+  SymbolGroup,
 } from "@/types"
 
 import constants from "@/constants"
@@ -67,6 +69,20 @@ export async function fetchStaticPoints(
   const params = new URLSearchParams()
   if (type) params.set("type", type)
   const res = await fetch(`${BASE_URL}/static-points/?${params}`)
+  if (!res.ok) throw new Error(`API error ${res.status}`)
+  return res.json()
+}
+
+// Curated MarketSymbol panel (drives the symbol browser + Markets sections).
+export async function fetchSymbols(
+  opts: { group?: SymbolGroup; stream_key?: StreamKey; forecast?: boolean; popular?: boolean } = {}
+): Promise<SymbolsResponse> {
+  const params = new URLSearchParams()
+  if (opts.group) params.set("group", opts.group)
+  if (opts.stream_key) params.set("stream_key", opts.stream_key)
+  if (opts.forecast !== undefined) params.set("forecast", String(opts.forecast))
+  if (opts.popular !== undefined) params.set("popular", String(opts.popular))
+  const res = await fetch(`${BASE_URL}/symbols/?${params}`)
   if (!res.ok) throw new Error(`API error ${res.status}`)
   return res.json()
 }

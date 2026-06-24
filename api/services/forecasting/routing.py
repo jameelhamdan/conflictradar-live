@@ -16,13 +16,18 @@ Two entry points:
 
 from __future__ import annotations
 
-# ── Indicator panel (plan §"Indicator panel") ────────────────────────────────
-# Every symbol the router may emit. ^VIX and SPY are explicitly part of the panel
-# (previously absent from the default routing rules).
-PANEL_SYMBOLS: list[str] = [
-    'GC=F', 'CL=F', 'NG=F', 'ZW=F', 'DX-Y.NYB', '^TNX', '^VIX', 'SPY',
-    'BTC-USD', 'ETH-USD',
-]
+# ── Indicator panel ───────────────────────────────────────────────────────────
+# The forecasting target panel is now DB-driven (MarketSymbol.is_forecast). The
+# literal below is only a fallback when the table is empty/unreachable. Read the
+# live panel via get_panel_symbols(); rules intersect their emitted symbols with it
+# so the router never emits a non-panel symbol.
+PANEL_SYMBOLS: list[str] = ['CL=F', 'GC=F', 'BTC-USD', 'SPY', 'EURUSD=X']
+
+
+def get_panel_symbols() -> list[str]:
+    """Live forecasting panel (MarketSymbol.is_forecast). Falls back to PANEL_SYMBOLS."""
+    from services.market_symbols import get_panel_symbols as _gp
+    return _gp()
 
 # topic slug → affected symbols (highest-signal routing)
 TOPIC_TO_SYMBOLS: dict[str, list[str]] = {
@@ -189,7 +194,11 @@ def route_event_to_symbols(
     location: str,
     topic_slugs: list[str],
 ) -> list[str]:
-    """Return a deduplicated list of symbols this event likely affects."""
+    """Return a deduplicated list of symbols this event likely affects.
+
+    Emitted symbols are intersected with the live forecasting panel
+    (``get_panel_symbols()``) so the router never emits a non-panel symbol.
+    """
     symbols: list[str] = []
 
     for slug in topic_slugs:
@@ -203,10 +212,11 @@ def route_event_to_symbols(
     if not symbols:
         symbols.extend(CATEGORY_DEFAULTS.get(category, []))
 
+    panel = set(get_panel_symbols())
     seen: set[str] = set()
     result: list[str] = []
     for s in symbols:
-        if s not in seen:
+        if s in panel and s not in seen:
             seen.add(s)
             result.append(s)
     return result

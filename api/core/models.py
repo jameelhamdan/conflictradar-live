@@ -104,6 +104,12 @@ class Article(models.Model):
     sub_category = models.CharField(max_length=64, null=True, blank=True)
     processed_on = models.DateTimeField(null=True, blank=True)
 
+    # Per-stage pipeline outcome tracking — written by each per-record worker.
+    # Shape: {"process": {"ok": true, "at": "ISO-8601", "error": null},
+    #         "geocode": {"ok": false, "at": "...", "error": "g4f down"}, ...}
+    # Makes the *reason* a stage is missing visible (not just that it's missing).
+    stage_status = models.JSONField(default=dict, blank=True)
+
     # Media — populated during fetch (RSS) or process_articles (OG image fallback)
     banner_image_url = models.URLField(max_length=512, null=True, blank=True)
 
@@ -192,6 +198,16 @@ class Event(models.Model):
 
     # Flat slug list for queryable filtering (parallel to topics dict)
     topic_slugs = models.JSONField(default=list, blank=True)
+
+    # Which matcher produced `topics`: 'llm' (LLMTopicMatcher succeeded) or
+    # 'keyword' (LLM was unavailable, fell back to keyword TopicMatcher).
+    # Keyword-fallback tags are low-confidence and possibly wrong, so they are
+    # re-evaluated by the LLM on a later tag_events_with_topics run. Empty = untagged.
+    topics_source = models.CharField(max_length=8, default='', blank=True)
+
+    # Per-stage pipeline outcome tracking — see Article.stage_status. Stages here are
+    # 'tag' and 'route'. Shape: {"route": {"ok": true, "at": "...", "error": null}, ...}
+    stage_status = models.JSONField(default=dict, blank=True)
 
     updated_on = models.DateTimeField(auto_now=True)
     created_on = models.DateTimeField(auto_now_add=True)
@@ -511,6 +527,105 @@ class StaticPoint(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.code})'
+
+
+class MarketSymbol(models.Model):
+    """A curated market symbol — the single source of truth for what the price
+    streams fetch, what the forecasting layer targets, and what the Markets UI
+    shows. Replaces the hardcoded symbol lists previously scattered across
+    streams/prices.py, forecasting/history.py, forecasting/routing.py, and
+    ui/src/lib/symbols.ts. Seeded with defaults by migration 0006.
+    """
+
+    class Provider(models.TextChoices):
+        YAHOO     = 'yahoo',     _('Yahoo Finance')
+        COINGECKO = 'coingecko', _('CoinGecko')
+        ECB       = 'ecb',       _('ECB (forex)')
+
+    class StreamKey(models.TextChoices):
+        STOCK     = 'stock',     _('Stock')
+        CRYPTO    = 'crypto',    _('Crypto')
+        COMMODITY = 'commodity', _('Commodity')
+        FOREX     = 'forex',     _('Forex')
+        BOND      = 'bond',      _('Bond')
+        INDEX     = 'index',     _('Index')
+
+    class Group(models.TextChoices):
+        TOP_STOCK  = 'top_stock',  _('Top Stock')
+        TOP_CRYPTO = 'top_crypto', _('Top Crypto')
+        RESOURCE   = 'resource',   _('Resource / Commodity')
+        FOREX      = 'forex',      _('Forex')
+        BOND       = 'bond',       _('Bond')
+        INDEX      = 'index',      _('Index')
+        OTHER      = 'other',      _('Other')
+
+    symbol       = models.CharField(max_length=32, unique=True)   # "GC=F", "BTC-USD"
+    name         = models.CharField(max_length=128)
+    stream_key   = models.CharField(max_length=16, choices=StreamKey.choices, default=StreamKey.STOCK)
+    provider     = models.CharField(max_length=16, choices=Provider.choices, default=Provider.YAHOO)
+    provider_id  = models.CharField(max_length=64, blank=True)    # CoinGecko id, blank otherwise
+    group        = models.CharField(max_length=16, choices=Group.choices, default=Group.OTHER)
+
+    is_active    = models.BooleanField(default=True)   # fetched by the price streams
+    is_forecast  = models.BooleanField(default=False)  # a forecasting target (panel symbol)
+    is_popular   = models.BooleanField(default=False)  # surfaced in "most popular" lists
+    rank         = models.IntegerField(default=0)      # ordering within is_popular
+    display_order = models.IntegerField(default=0)     # ordering within a group
+
+    metadata     = models.JSONField(default=dict, blank=True)
+    created_on   = models.DateTimeField(auto_now_add=True)
+    updated_on   = models.DateTimeField(auto_now=True)
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['group', 'display_order', 'symbol']
+        indexes = [
+            models.Index(fields=['stream_key', 'is_active']),
+            models.Index(fields=['is_forecast']),
+            models.Index(fields=['group']),
+        ]
+
+    def __str__(self):
+        return f'{self.symbol} ({self.name})'
+
+
+class TaskRun(models.Model):
+    """One recorded execution of a pipeline/stream task — the data source for the
+    admin operations dashboard's throughput stats and in-flight view. Written
+    centrally by the @tracked wrapper in services/queue.py, so every run is
+    recorded with no per-task boilerplate.
+    """
+
+    class Status(models.TextChoices):
+        RUNNING   = 'running',   _('Running')
+        SUCCESS   = 'success',   _('Success')
+        FAILED    = 'failed',    _('Failed')
+        CANCELLED = 'cancelled', _('Cancelled')
+
+    task_name   = models.CharField(max_length=128)
+    queue       = models.CharField(max_length=16, default='default')
+    status      = models.CharField(max_length=16, choices=Status.choices, default=Status.RUNNING)
+    started_at  = models.DateTimeField()
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_ms = models.IntegerField(null=True, blank=True)
+    items       = models.IntegerField(null=True, blank=True)   # result count where applicable
+    error       = models.TextField(blank=True)
+    params      = models.JSONField(default=dict, blank=True)
+    job_id      = models.CharField(max_length=64, blank=True)  # RQ id, blank in sync mode
+
+    objects = MongoManager()
+
+    class Meta:
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['task_name', 'started_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['started_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.task_name} [{self.status}] {self.started_at:%Y-%m-%d %H:%M}'
 
 
 # ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from django.conf import settings
 
 from . import features as feat
-from .routing import PANEL_SYMBOLS
+from .routing import get_panel_symbols
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,7 @@ def run_backtest(symbols=None, years=2, step_days=21, train_window_days=None,
     """Run the full walk-forward backtest across all arms/horizons; write + return the report."""
     import pandas as pd
 
-    symbols = list(symbols or PANEL_SYMBOLS)
+    symbols = list(symbols or get_panel_symbols())
     horizons = horizons or settings.FORECAST_HORIZONS_DAYS
     train_window_days = train_window_days or settings.FORECAST_TRAIN_WINDOW_DAYS
 

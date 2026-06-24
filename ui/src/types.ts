@@ -177,6 +177,28 @@ export interface StaticPointsResponse {
   count: number
 }
 
+export type SymbolGroup =
+  | "top_stock" | "top_crypto" | "resource" | "forex" | "bond" | "index" | "other"
+
+export interface MarketSymbol {
+  id: string
+  symbol: string
+  name: string
+  stream_key: StreamKey
+  provider: string
+  group: SymbolGroup
+  is_active: boolean
+  is_forecast: boolean
+  is_popular: boolean
+  rank: number
+  display_order: number
+}
+
+export interface SymbolsResponse {
+  results: MarketSymbol[]
+  count: number
+}
+
 export interface NewsletterSummary {
   id: string
   date: string

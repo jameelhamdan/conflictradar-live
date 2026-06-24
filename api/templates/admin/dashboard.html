@@ -1,0 +1,151 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="ops">
+
+  <h1>Operations Dashboard</h1>
+
+  {# ── Quick actions ───────────────────────────────────────────────── #}
+  <section class="ops-card">
+    <h2>Actions</h2>
+    <form method="post" class="ops-actions">
+      {% csrf_token %}
+      <button class="button" name="dashboard_action" value="run_pipeline">▶ Run full sync</button>
+      <button class="button" name="dashboard_action" value="backfill_prices">Backfill prices</button>
+      <button class="button" name="dashboard_action" value="backfill_articles">Backfill articles</button>
+      <button class="button" name="dashboard_action" value="retrain_forecast">Retrain forecast</button>
+      <button class="button" name="dashboard_action" value="rerun_bootstrap">Re-run bootstrap</button>
+    </form>
+    <form method="post" class="ops-actions" style="margin-top:8px">
+      {% csrf_token %}
+      <input type="hidden" name="dashboard_action" value="cancel_job">
+      <input type="text" name="job_id" placeholder="RQ job id" style="width:22em">
+      <button class="button" type="submit">Cancel job</button>
+    </form>
+  </section>
+
+  {# ── Pipeline coverage ───────────────────────────────────────────── #}
+  <section class="ops-card">
+    <h2>Pipeline coverage</h2>
+    <table class="ops-table">
+      <thead><tr><th>Stage</th><th>Need reprocessing</th><th>Last error</th><th></th></tr></thead>
+      <tbody>
+      {% for c in coverage %}
+        <tr>
+          <td>{{ c.label }}</td>
+          <td class="{% if c.need %}ops-warn{% endif %}">{{ c.need }}</td>
+          <td class="ops-muted">{{ c.error_sample|default:"—" }}</td>
+          <td>
+            {% if c.need %}
+            <form method="post" style="display:inline">
+              {% csrf_token %}
+              <input type="hidden" name="dashboard_action" value="reprocess">
+              <input type="hidden" name="stage" value="{{ c.stage }}">
+              <button class="button" type="submit">Reprocess</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="ops-muted">No coverage data.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {# ── Throughput ──────────────────────────────────────────────────── #}
+  <section class="ops-card">
+    <h2>Throughput (items / runs)</h2>
+    <table class="ops-table">
+      <thead><tr>
+        <th>Task</th><th>Today</th><th>Yesterday</th>
+        <th>Failed (today)</th><th>Last success</th><th>Last error</th>
+      </tr></thead>
+      <tbody>
+      {% for name, s in throughput.items %}
+        <tr>
+          <td>{{ name }}</td>
+          <td>{{ s.today_items }} / {{ s.today_runs }}</td>
+          <td>{{ s.yest_items }} / {{ s.yest_runs }}</td>
+          <td class="{% if s.today_failed %}ops-warn{% endif %}">{{ s.today_failed }}</td>
+          <td class="ops-muted">{{ s.last_success|default:"—" }}</td>
+          <td class="ops-muted">{{ s.last_error|default:"" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="ops-muted">No runs recorded yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <div class="ops-grid">
+    {# ── Upcoming runs ─────────────────────────────────────────────── #}
+    <section class="ops-card">
+      <h2>Upcoming runs</h2>
+      <table class="ops-table">
+        <thead><tr><th>Task</th><th>Scheduled</th></tr></thead>
+        <tbody>
+        {% for u in upcoming %}
+          <tr><td>{{ u.task }}</td><td class="ops-muted">{{ u.when|default:"—" }}</td></tr>
+        {% empty %}
+          <tr><td colspan="2" class="ops-muted">No scheduled jobs visible.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {# ── In-flight ─────────────────────────────────────────────────── #}
+    <section class="ops-card">
+      <h2>In-flight</h2>
+      <table class="ops-table">
+        <thead><tr><th>Task</th><th>Started</th><th>Job id</th></tr></thead>
+        <tbody>
+        {% for r in in_flight %}
+          <tr><td>{{ r.task_name }}</td><td class="ops-muted">{{ r.started_at }}</td><td class="ops-muted">{{ r.job_id|default:"(sync)" }}</td></tr>
+        {% empty %}
+          <tr><td colspan="3" class="ops-muted">Nothing running.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  {# ── Forecast model status ───────────────────────────────────────── #}
+  <section class="ops-card">
+    <h2>Forecast model</h2>
+    <p>
+      Enabled: <strong>{{ forecast.enabled }}</strong> ·
+      Last forecast: <strong>{{ forecast.last_forecast|default:"—" }}</strong> ·
+      Directional accuracy: <strong>{{ forecast.accuracy|default:"n/a" }}</strong>
+      ({{ forecast.scored }} scored)
+    </p>
+    <table class="ops-table">
+      <thead><tr><th>Artifact</th><th>Last trained</th></tr></thead>
+      <tbody>
+      {% for a in forecast.artifacts %}
+        <tr><td>{{ a.name }}</td><td class="ops-muted">{{ a.mtime }}</td></tr>
+      {% empty %}
+        <tr><td colspan="2" class="ops-muted">No model artifacts found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <p class="ops-muted">RQ queue detail: <a href="/admin/django-rq/">/admin/django-rq/</a></p>
+</div>
+
+<style>
+.ops { max-width: 1100px; }
+.ops-card { margin: 0 0 18px; padding: 14px 16px; background:#1e2228; border:1px solid #2c3038; border-radius:4px; }
+.ops-card h2 { margin: 0 0 10px; font-size: 14px; color:#79aec8; }
+.ops-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.ops-table { width:100%; border-collapse: collapse; font-size: 12px; }
+.ops-table th, .ops-table td { text-align:left; padding:5px 8px; border-bottom:1px solid #2c3038; }
+.ops-table th { color:#999; font-weight:600; }
+.ops-muted { color:#888; }
+.ops-warn { color:#e0a052; font-weight:600; }
+.ops-grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
+@media (max-width: 800px){ .ops-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}

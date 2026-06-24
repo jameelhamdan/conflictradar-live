@@ -14,7 +14,7 @@ import logging
 import math
 from datetime import timedelta
 
-from .routing import PANEL_SYMBOLS
+from .routing import get_panel_symbols
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +194,7 @@ def _zero_event_features():
 
 
 def _symbol_onehot(symbol):
-    return {f'sym_{s}': (1.0 if s == symbol else 0.0) for s in PANEL_SYMBOLS}
+    return {f'sym_{s}': (1.0 if s == symbol else 0.0) for s in get_panel_symbols()}
 
 
 # ── frame builders ──────────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ def build_training_frame(symbols=None, start=None, end=None, horizons=(1, 5),
     """
     import pandas as pd
 
-    symbols = list(symbols or PANEL_SYMBOLS)
+    symbols = list(symbols or get_panel_symbols())
     bars = _load_bars(symbols)
     if not bars:
         return pd.DataFrame()
@@ -258,7 +258,7 @@ def build_feature_matrix(as_of_date=None, symbols=None, include_events=True, rou
     """Return one feature row per symbol as-of ``as_of_date`` (latest bar <= as_of). No labels."""
     import pandas as pd
 
-    symbols = list(symbols or PANEL_SYMBOLS)
+    symbols = list(symbols or get_panel_symbols())
     bars = _load_bars(symbols)
     if not bars:
         return pd.DataFrame()

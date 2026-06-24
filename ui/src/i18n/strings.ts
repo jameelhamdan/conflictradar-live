@@ -136,6 +136,22 @@ export interface UIStrings {
   symbolRangeHigh: string
   symbolRangeLow: string
   symbolRangeChange: string
+  // Symbol browser + forecast explainer
+  symbolBrowser: string
+  symbolBrowserNote: string
+  groupTopStock: string
+  groupTopCrypto: string
+  groupResource: string
+  groupForex: string
+  groupBond: string
+  groupIndex: string
+  groupOther: string
+  forecastInfoTitle: string
+  forecastInfoHow: string
+  forecastInfoSymbols: string
+  forecastInfoHorizons: string
+  forecastInfoRouter: string
+  forecastInfoAccuracy: string
   // Price chart
   priceVolume: string
   priceNoHistory: string
@@ -337,6 +353,22 @@ export const UI: Record<Language, UIStrings> = {
     symbolRangeHigh: "High",
     symbolRangeLow: "Low",
     symbolRangeChange: "Change",
+    symbolBrowser: "All symbols",
+    symbolBrowserNote: "Browse every tracked symbol by class; click one to see its history.",
+    groupTopStock: "Top stocks",
+    groupTopCrypto: "Top crypto",
+    groupResource: "Resources",
+    groupForex: "Forex",
+    groupBond: "Bonds",
+    groupIndex: "Indices",
+    groupOther: "Other",
+    forecastInfoTitle: "How forecasting works",
+    forecastInfoHow:
+      "Backfilled daily prices are the label; routed/labeled news events are features. A model learns whether events actually predict the forward return between two real price nodes.",
+    forecastInfoSymbols: "Base symbols",
+    forecastInfoHorizons: "Horizons: 1-day and 5-day forward returns.",
+    forecastInfoRouter: "Event router",
+    forecastInfoAccuracy: "Live directional accuracy",
     priceVolume: "Volume",
     priceNoHistory: "No price history",
     affectedIndicators: "Affected indicators",
@@ -547,6 +579,22 @@ export const UI: Record<Language, UIStrings> = {
     symbolRangeHigh: "أعلى",
     symbolRangeLow: "أدنى",
     symbolRangeChange: "التغيّر",
+    symbolBrowser: "كل الرموز",
+    symbolBrowserNote: "تصفّح كل الرموز المتتبَّعة حسب الفئة؛ انقر على رمز لعرض سجله.",
+    groupTopStock: "أبرز الأسهم",
+    groupTopCrypto: "أبرز العملات الرقمية",
+    groupResource: "الموارد",
+    groupForex: "العملات",
+    groupBond: "السندات",
+    groupIndex: "المؤشرات",
+    groupOther: "أخرى",
+    forecastInfoTitle: "كيف تعمل التوقعات",
+    forecastInfoHow:
+      "الأسعار اليومية التاريخية هي الهدف؛ وأحداث الأخبار المُوجَّهة والمُصنَّفة هي السمات. يتعلّم النموذج ما إذا كانت الأحداث تتنبأ فعليًا بالعائد المستقبلي بين سعرين حقيقيين.",
+    forecastInfoSymbols: "الرموز الأساسية",
+    forecastInfoHorizons: "الآفاق: عائد يوم واحد و٥ أيام.",
+    forecastInfoRouter: "موجِّه الأحداث",
+    forecastInfoAccuracy: "دقة الاتجاه المباشرة",
     priceVolume: "الحجم",
     priceNoHistory: "لا يوجد سجل أسعار",
     affectedIndicators: "المؤشرات المتأثرة",

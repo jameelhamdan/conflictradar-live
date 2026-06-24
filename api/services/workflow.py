@@ -97,6 +97,7 @@ class Workflow:
         source_code: str | None = None,
         reprocess: bool = False,
         only_failed: bool = False,
+        ids: list | None = None,
     ) -> int:
         """
         Step 2 — Clean: run HuggingFace NER + VADER sentiment on Articles; use LLM for category + location.
@@ -105,21 +106,31 @@ class Workflow:
         only_failed: re-run NLP on articles that were processed but ended up with no location
         (e.g. the LLM/geo step failed — these can never aggregate into Events and are otherwise
         never retried). Recovers a batch stuck by an LLM-provider outage.
+
+        ids: when given, process exactly these article ids (used by the per-record fan-out
+        worker ``process_article_task`` — see services/tasks.py). Bypasses the
+        unprocessed/only_failed selection so a re-run is idempotent per record.
         """
+        import uuid as _uuid
         from core.models import Article, ArticleDocument
         from services.processing.cleaner import ArticleCleaner, CleaningError
+        from services.stages import mark_stage
 
-        qs = Article.objects.all()
-        if source_code:
-            qs = qs.filter(source_code=source_code)
-        if only_failed:
-            # Processed but un-located; skip ones already confirmed un-geocodable on a prior retry.
-            qs = qs.filter(processed_on__isnull=False, location__isnull=True)
-            articles = [a for a in qs if not (a.extra_data or {}).get('geo_failed')][:limit]
+        if ids is not None:
+            uuids = [i if isinstance(i, _uuid.UUID) else _uuid.UUID(str(i)) for i in ids]
+            articles = list(Article.objects.filter(id__in=uuids))
         else:
-            if not reprocess:
-                qs = qs.filter(processed_on__isnull=True)
-            articles = list(qs[:limit])
+            qs = Article.objects.all()
+            if source_code:
+                qs = qs.filter(source_code=source_code)
+            if only_failed:
+                # Processed but un-located; skip ones already confirmed un-geocodable on a prior retry.
+                qs = qs.filter(processed_on__isnull=False, location__isnull=True)
+                articles = [a for a in qs if not (a.extra_data or {}).get('geo_failed')][:limit]
+            else:
+                if not reprocess:
+                    qs = qs.filter(processed_on__isnull=True)
+                articles = list(qs[:limit])
 
         if not articles:
             return 0
@@ -162,11 +173,17 @@ class Workflow:
             article.extra_data = extra
             article.translations = features.translations
 
+            # Per-record stage tracking: 'process' always succeeds here; 'geocode' is the
+            # known g4f-outage gap — ok iff a location was resolved.
+            mark_stage(article, 'process', ok=True)
+            mark_stage(article, 'geocode', ok=bool(features.location),
+                       error=None if features.location else 'no location resolved')
+
             # Best-effort: fetch og:image if no banner set yet and URL is reachable
             update_fields = [
                 'entities', 'sentiment', 'finbert_sentiment', 'location', 'latitude', 'longitude',
                 'event_intensity', 'category', 'sub_category', 'processed_on',
-                'extra_data', 'translations',
+                'extra_data', 'translations', 'stage_status',
             ]
             if not article.banner_image_url and article.source_url and article.source_url.startswith('https://'):
                 og = _fetch_og_image(article.source_url)
@@ -477,6 +494,70 @@ class Workflow:
         return active_count
 
     @classmethod
+    def pipeline_coverage(cls) -> list[dict]:
+        """Per-stage count of records stuck at a step + a sample error (WA3.6).
+
+        Returns one dict per stage:
+        ``{stage, model, label, need, action, error_sample}`` where ``need`` is the
+        number of records that reached the previous stage but not this one, and
+        ``action`` is the dashboard Reprocess button's action key. Cheap count queries.
+        """
+        from core.models import Article, Event
+
+        def _err_sample(model, stage):
+            try:
+                row = model.objects.filter(**{f'stage_status__{stage}__ok': False}).only('stage_status').first()
+                if row:
+                    return ((row.stage_status or {}).get(stage) or {}).get('error')
+            except Exception:  # noqa: BLE001 — nested JSON lookup may be unsupported
+                return None
+            return None
+
+        out: list[dict] = []
+
+        # Article: unprocessed (fetched but not processed)
+        out.append({
+            'stage': 'process', 'model': 'article', 'label': 'Unprocessed articles',
+            'need': Article.objects.filter(processed_on__isnull=True).count(),
+            'action': 'process', 'error_sample': None,
+        })
+        # Article: processed but un-located (the g4f-outage gap → never aggregates)
+        try:
+            unlocated = (
+                Article.objects.filter(processed_on__isnull=False, location__isnull=True).count()
+                + Article.objects.filter(processed_on__isnull=False, location='').count()
+            )
+        except Exception:  # noqa: BLE001
+            unlocated = Article.objects.filter(processed_on__isnull=False, location__isnull=True).count()
+        out.append({
+            'stage': 'geocode', 'model': 'article', 'label': 'Processed but un-located',
+            'need': unlocated, 'action': 'reprocess_unlocated',
+            'error_sample': _err_sample(Article, 'geocode'),
+        })
+        # Event: untagged (no topics_source) or keyword-fallback (low-confidence)
+        try:
+            untagged = (
+                Event.objects.filter(topics_source='').count()
+                + Event.objects.filter(topics_source='keyword').count()
+            )
+        except Exception:  # noqa: BLE001
+            untagged = Event.objects.filter(topics_source='').count()
+        out.append({
+            'stage': 'tag', 'model': 'event', 'label': 'Untagged / keyword-fallback events',
+            'need': untagged, 'action': 'tag', 'error_sample': _err_sample(Event, 'tag'),
+        })
+        # Event: unrouted (no affected_indicators)
+        try:
+            unrouted = Event.objects.filter(affected_indicators=[]).count()
+        except Exception:  # noqa: BLE001
+            unrouted = 0
+        out.append({
+            'stage': 'route', 'model': 'event', 'label': 'Unrouted events',
+            'need': unrouted, 'action': 'route', 'error_sample': _err_sample(Event, 'route'),
+        })
+        return out
+
+    @classmethod
     def prune_stale_topics(cls, stale_days: int | None = None) -> int:
         """Hide top-bar topics with no tagged events in `stale_days` (default 90).
 
@@ -536,9 +617,14 @@ class Workflow:
         # Fetch events in the window
         qs = Event.objects.filter(started_at__gte=lookback)
         if not force_retag:
-            # Process events that have no topics OR have the old list-of-strings format
+            # Process events that have no topics, the old list-of-strings format, OR
+            # were tagged by the keyword fallback while the LLM was down — those tags
+            # are low-confidence/possibly wrong, so re-evaluate them now the LLM may be up.
             events_all = list(qs)
-            events = [e for e in events_all if _needs_tagging(e.topics)]
+            events = [
+                e for e in events_all
+                if _needs_tagging(e.topics) or e.topics_source == 'keyword'
+            ]
         else:
             events = list(qs)
 
@@ -546,17 +632,50 @@ class Workflow:
             logger.info('[topics] No events to tag in the last %d hour(s)', hours)
             return 0
 
+        tagged = cls._apply_topic_tags(events, all_active_topics)
+        logger.info('[topics] tag_events_with_topics done — %d event(s) processed', tagged)
+
+        # Recount event_count for all active topics over a 7-day window
+        cls._update_topic_event_counts(all_active_topics)
+
+        return tagged
+
+    @classmethod
+    def tag_events_by_ids(cls, event_ids: list) -> int:
+        """Tag a specific set of events by id — the per-record fan-out worker
+        (``tag_events_chunk_task``). Reuses the same LLM matcher + routing path."""
+        from core.models import Topic, Event
+
+        all_active_topics = list(Topic.objects.filter(is_active=True))
+        events = list(Event.objects.filter(pk__in=list(event_ids)))
+        if not all_active_topics or not events:
+            return 0
+        tagged = cls._apply_topic_tags(events, all_active_topics)
+        cls._update_topic_event_counts(all_active_topics)
+        return tagged
+
+    @classmethod
+    def _apply_topic_tags(cls, events: list, all_active_topics: list) -> int:
+        """Run the LLM matcher over ``events`` and persist topics + re-routed indicators.
+        Records the per-record 'tag' stage. Returns the number of events processed."""
+        from services.topics.matcher import LLMTopicMatcher
+        from services.forecasting.routing import route_event_to_weighted_symbols
+        from services.stages import mark_stage
+
         llm_matcher = LLMTopicMatcher()
         # Use all active topics — named conflicts span years so temporal filtering
         # is unnecessary and would reduce recall.
-        batch_results = llm_matcher.match_batch(events, all_active_topics)
+        batch_results, batch_sources = llm_matcher.match_batch(events, all_active_topics)
 
-        from services.forecasting.routing import route_event_to_weighted_symbols
         tagged = 0
         for event in events:
             result = batch_results.get(str(event.pk), {})
             event.topics = result
             event.topic_slugs = list(result.keys())
+            # Track which matcher produced these topics. 'keyword' means the LLM was
+            # unavailable, so the event is re-tagged on a later run (see selection above).
+            source = batch_sources.get(str(event.pk), 'keyword')
+            event.topics_source = source
             # Re-route now that topic slugs are known — topics carry the highest-signal
             # routing rules, so affected_indicators improves once an event is tagged.
             route_sentiment = (
@@ -568,14 +687,12 @@ class Workflow:
                 event.category, event.location_name, event.topic_slugs,
                 event.sub_categories or [], route_sentiment,
             )
-            event.save(update_fields=['topics', 'topic_slugs', 'affected_indicators'])
+            mark_stage(event, 'tag', ok=(source == 'llm'),
+                       error=None if source == 'llm' else 'keyword fallback (LLM unavailable)')
+            event.save(update_fields=[
+                'topics', 'topic_slugs', 'topics_source', 'affected_indicators', 'stage_status',
+            ])
             tagged += 1
-
-        logger.info('[topics] tag_events_with_topics done — %d event(s) processed', tagged)
-
-        # Recount event_count for all active topics over a 7-day window
-        cls._update_topic_event_counts(all_active_topics)
-
         return tagged
 
     @classmethod

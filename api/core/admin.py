@@ -9,6 +9,44 @@ from import_export.admin import ImportExportModelAdmin
 from . import models
 
 
+class ArticleStageFilter(admin.SimpleListFilter):
+    """Filter articles by which pipeline stage they are stuck at (WA3.6)."""
+    title = "pipeline gap"
+    parameter_name = "stage_gap"
+
+    def lookups(self, request, model_admin):
+        return [("unprocessed", "Unprocessed"), ("unlocated", "Processed but un-located")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "unprocessed":
+            return queryset.filter(processed_on__isnull=True)
+        if self.value() == "unlocated":
+            return queryset.filter(processed_on__isnull=False, location__isnull=True)
+        return queryset
+
+
+class EventStageFilter(admin.SimpleListFilter):
+    """Filter events by which pipeline stage they are stuck at (WA3.6)."""
+    title = "pipeline gap"
+    parameter_name = "stage_gap"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("untagged", "Untagged"),
+            ("keyword", "Keyword-fallback tags"),
+            ("unrouted", "Unrouted"),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "untagged":
+            return queryset.filter(topics_source="")
+        if self.value() == "keyword":
+            return queryset.filter(topics_source="keyword")
+        if self.value() == "unrouted":
+            return queryset.filter(affected_indicators=[])
+        return queryset
+
+
 class SourceResource(resources.ModelResource):
     class Meta:
         model = models.Source
@@ -137,8 +175,18 @@ class ArticleAdmin(ImportExportModelAdmin):
         "published_on",
         "processed_on",
     ]
-    list_filter = ["source_type", "source_code", "category"]
+    list_filter = ["source_type", "source_code", "category", ArticleStageFilter]
     search_fields = ["title", "location", "category"]
+    actions = ["reprocess_selected"]
+
+    @admin.action(description="Reprocess selected (NLP / geocode)")
+    def reprocess_selected(self, request, queryset):
+        from services.queue import enqueue
+        from services.tasks import process_articles_chunk_task
+        ids = [a.id for a in queryset]
+        if ids:
+            enqueue(process_articles_chunk_task, ids, True, queue="heavy")
+        self.message_user(request, f"Reprocess enqueued for {len(ids)} article(s).", messages.SUCCESS)
     readonly_fields = [
         "id",
         "entities",
@@ -233,7 +281,7 @@ class EventAdmin(admin.ModelAdmin):
         "avg_intensity",
         "started_at",
     ]
-    list_filter = ["category"]
+    list_filter = ["category", EventStageFilter]
     search_fields = ["title", "location_name"]
     readonly_fields = [
         "article_count",
@@ -244,6 +292,25 @@ class EventAdmin(admin.ModelAdmin):
         "created_on",
         "updated_on",
     ]
+    actions = ["retag_selected", "reroute_selected"]
+
+    @admin.action(description="Re-tag topics for selected events")
+    def retag_selected(self, request, queryset):
+        from services.queue import enqueue
+        from services.tasks import tag_events_chunk_task
+        ids = [e.pk for e in queryset]
+        if ids:
+            enqueue(tag_events_chunk_task, ids, queue="heavy")
+        self.message_user(request, f"Re-tag enqueued for {len(ids)} event(s).", messages.SUCCESS)
+
+    @admin.action(description="Re-route selected events to symbols")
+    def reroute_selected(self, request, queryset):
+        from services.queue import enqueue
+        from services.tasks import route_events_chunk_task
+        ids = [e.pk for e in queryset]
+        if ids:
+            enqueue(route_events_chunk_task, ids, queue="heavy")
+        self.message_user(request, f"Re-route enqueued for {len(ids)} event(s).", messages.SUCCESS)
 
 
 @admin.register(models.PriceTick)
@@ -361,6 +428,68 @@ class TopicAdmin(admin.ModelAdmin):
         return redirect(request.path)
 
 
+class MarketSymbolResource(resources.ModelResource):
+    class Meta:
+        model = models.MarketSymbol
+        fields = (
+            "symbol", "name", "stream_key", "provider", "provider_id", "group",
+            "is_active", "is_forecast", "is_popular", "rank", "display_order",
+        )
+        import_id_fields = ("symbol",)
+
+
+@admin.register(models.MarketSymbol)
+class MarketSymbolAdmin(ImportExportModelAdmin):
+    resource_classes = [MarketSymbolResource]
+    list_display = [
+        "symbol", "name", "stream_key", "provider", "group",
+        "is_active", "is_forecast", "is_popular", "rank", "display_order",
+    ]
+    list_filter = ["stream_key", "provider", "group", "is_active", "is_forecast", "is_popular"]
+    list_editable = ["is_active", "is_forecast", "is_popular", "rank", "display_order"]
+    search_fields = ["symbol", "name", "provider_id"]
+    actions = ["enable_active", "disable_active", "mark_forecast", "unmark_forecast"]
+
+    @admin.action(description="Mark selected as active (fetched by streams)")
+    def enable_active(self, request, queryset):
+        self.message_user(request, f"{queryset.update(is_active=True)} symbol(s) activated.")
+
+    @admin.action(description="Mark selected as inactive")
+    def disable_active(self, request, queryset):
+        self.message_user(request, f"{queryset.update(is_active=False)} symbol(s) deactivated.")
+
+    @admin.action(description="Add to forecast panel (is_forecast=True)")
+    def mark_forecast(self, request, queryset):
+        n = queryset.update(is_forecast=True)
+        self.message_user(
+            request,
+            f"{n} symbol(s) added to the forecast panel. Retrains on the next daily "
+            f"train_forecast_model_task.",
+            messages.WARNING,
+        )
+
+    @admin.action(description="Remove from forecast panel")
+    def unmark_forecast(self, request, queryset):
+        self.message_user(request, f"{queryset.update(is_forecast=False)} symbol(s) removed from panel.")
+
+
+@admin.register(models.TaskRun)
+class TaskRunAdmin(admin.ModelAdmin):
+    list_display = [
+        "task_name", "queue", "status", "items", "duration_ms",
+        "started_at", "finished_at", "job_id",
+    ]
+    list_filter = ["status", "queue", "task_name"]
+    search_fields = ["task_name", "job_id", "error"]
+    readonly_fields = [
+        "task_name", "queue", "status", "started_at", "finished_at",
+        "duration_ms", "items", "error", "params", "job_id",
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+
 @admin.register(models.StaticPoint)
 class StaticPointAdmin(admin.ModelAdmin):
     list_display = ["code", "point_type", "name", "country", "country_code", "is_active"]
@@ -371,5 +500,22 @@ class StaticPointAdmin(admin.ModelAdmin):
         if obj:
             return [*self.readonly_fields, "code"]
         return self.readonly_fields
+
+
+# ── Operations dashboard URL (WA5) ───────────────────────────────────────────
+# Register a custom admin view at /admin/dashboard/ by wrapping the default site's
+# get_urls (consistent with the project's custom changelist templates).
+_orig_admin_get_urls = admin.site.get_urls
+
+
+def _admin_get_urls():
+    from django.urls import path
+    from .admin_dashboard import dashboard_view
+    return [
+        path('dashboard/', admin.site.admin_view(dashboard_view), name='ops_dashboard'),
+    ] + _orig_admin_get_urls()
+
+
+admin.site.get_urls = _admin_get_urls
 
 

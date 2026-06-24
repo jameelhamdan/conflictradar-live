@@ -96,9 +96,16 @@ def _safe_change_pct(current, previous) -> float | None:
     return None
 
 
-def _coingecko_quotes() -> list[dict]:
-    """Fetch multiple crypto prices from CoinGecko (free, no key)."""
-    ids = ','.join(COINGECKO_IDS.keys())
+def _coingecko_quotes(id_to_symbol: dict | None = None) -> list[dict]:
+    """Fetch multiple crypto prices from CoinGecko (free, no key).
+
+    ``id_to_symbol`` maps CoinGecko id → (symbol, name); falls back to the hardcoded
+    ``COINGECKO_IDS`` when not provided (e.g. table empty).
+    """
+    mapping = id_to_symbol or COINGECKO_IDS
+    if not mapping:
+        return []
+    ids = ','.join(mapping.keys())
     url = 'https://api.coingecko.com/api/v3/simple/price'
     params = {
         'ids': ids,
@@ -116,7 +123,7 @@ def _coingecko_quotes() -> list[dict]:
 
     records = []
     now = dj_timezone.now()
-    for cg_id, (symbol, name) in COINGECKO_IDS.items():
+    for cg_id, (symbol, name) in mapping.items():
         coin = data.get(cg_id, {})
         if not coin:
             continue
@@ -140,26 +147,40 @@ class PriceStream(BaseStream):
     stream_type = 'price'
 
     def fetch(self) -> list[dict]:
-        stocks_raw = getattr(settings, 'PRICE_SYMBOLS_STOCKS', DEFAULT_STOCKS)
-        commodities_raw = getattr(settings, 'PRICE_SYMBOLS_COMMODITIES', DEFAULT_COMMODITIES)
-        bonds_raw = getattr(settings, 'PRICE_SYMBOLS_BONDS', DEFAULT_BONDS)
-        indices_raw = getattr(settings, 'PRICE_SYMBOLS_INDICES', DEFAULT_INDICES)
+        from services.market_symbols import get_yahoo_symbols, get_coingecko_ids, get_symbol_meta
 
-        yahoo_symbols = [
-            s.strip() for s in (
-                stocks_raw + ',' + commodities_raw + ',' + bonds_raw + ',' + indices_raw
-            ).split(',') if s.strip()
-        ]
-        # Dedupe while preserving order (DX-Y.NYB may appear via env in multiple lists)
+        # DB-driven symbol sets (MarketSymbol.is_active); fall back to env/defaults.
+        yahoo_symbols = get_yahoo_symbols()
+        if not yahoo_symbols:
+            stocks_raw = getattr(settings, 'PRICE_SYMBOLS_STOCKS', DEFAULT_STOCKS)
+            commodities_raw = getattr(settings, 'PRICE_SYMBOLS_COMMODITIES', DEFAULT_COMMODITIES)
+            bonds_raw = getattr(settings, 'PRICE_SYMBOLS_BONDS', DEFAULT_BONDS)
+            indices_raw = getattr(settings, 'PRICE_SYMBOLS_INDICES', DEFAULT_INDICES)
+            yahoo_symbols = [
+                s.strip() for s in (
+                    stocks_raw + ',' + commodities_raw + ',' + bonds_raw + ',' + indices_raw
+                ).split(',') if s.strip()
+            ]
+        # Dedupe while preserving order
         yahoo_symbols = list(dict.fromkeys(yahoo_symbols))
+        meta = get_symbol_meta()
 
         records = []
         for symbol in yahoo_symbols:
             quote = _yahoo_quote(symbol)
             if quote and quote.get('value') is not None:
+                # Prefer DB name/stream_key when available.
+                if symbol in meta:
+                    quote['stream_key'], quote['name'] = meta[symbol]
                 records.append(quote)
 
-        records.extend(r for r in _coingecko_quotes() if r.get('value') is not None)
+        # CoinGecko id → (symbol, name) from the DB (fallback to hardcoded).
+        cg_ids = get_coingecko_ids()
+        id_to_symbol = {
+            cg_id: (sym, meta.get(sym, ('crypto', sym))[1])
+            for sym, cg_id in cg_ids.items()
+        } or None
+        records.extend(r for r in _coingecko_quotes(id_to_symbol) if r.get('value') is not None)
         return records
 
     def save(self, records: list[dict]) -> int:

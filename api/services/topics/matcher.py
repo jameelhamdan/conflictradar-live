@@ -88,16 +88,24 @@ class LLMTopicMatcher:
         self,
         events: list,
         topics: list,
-    ) -> dict[str, dict[str, float]]:
+    ) -> tuple[dict[str, dict[str, float]], dict[str, str]]:
         """
         Match a list of Event objects against a list of Topic objects.
 
-        Returns {str(event.pk): {topic_slug: confidence}} for all events.
-        Falls back to TopicMatcher on LLM error.
+        Returns a ``(results, sources)`` tuple:
+          - ``results``: {str(event.pk): {topic_slug: confidence}} for all events.
+          - ``sources``: {str(event.pk): 'llm' | 'keyword'} — which matcher produced
+            the result. ``'keyword'`` marks events tagged by the fallback (LLM was
+            unavailable); the caller re-evaluates those on a later run.
+
+        Falls back to TopicMatcher per-event on LLM error.
         """
         from services.llm import get_llm_service
 
         results: dict[str, dict[str, float]] = {str(e.pk): {} for e in events}
+        # Default 'keyword' = not confidently LLM-tagged (covers pre-filtered events
+        # that never reach the LLM); flipped to 'llm' below when the LLM succeeds.
+        sources: dict[str, str] = {str(e.pk): 'keyword' for e in events}
 
         # Pre-filter with the free keyword matcher: only escalate events that have
         # at least one keyword candidate to the LLM. Events with zero keyword
@@ -112,7 +120,7 @@ class LLMTopicMatcher:
                 len(candidates), len(events), skipped,
             )
         if not candidates:
-            return results
+            return results, sources
 
         # Build prompt fragments shared across all batches
         situation_lines = '\n'.join(
@@ -172,6 +180,7 @@ class LLMTopicMatcher:
                         if slug in valid_slugs
                     }
                     results[event_key] = cleaned
+                    sources[event_key] = 'llm'
                     if cleaned:
                         logger.info(
                             '[topics] LLM tagged "%s" → %s',
@@ -189,5 +198,6 @@ class LLMTopicMatcher:
                 fallback = TopicMatcher()
                 for event in batch:
                     results[str(event.pk)] = fallback.match(event, topics)
+                    # source stays 'keyword' (default) — flagged for LLM retry later
 
-        return results
+        return results, sources

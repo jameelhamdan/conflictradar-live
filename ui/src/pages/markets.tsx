@@ -9,6 +9,8 @@ import IndicatorsLineChart from "../components/markets/IndicatorsLineChart";
 import CauseEffectGraph from "../components/markets/CauseEffectGraph";
 import SymbolDetail from "../components/markets/SymbolDetail";
 import MoversStrip from "../components/markets/MoversStrip";
+import SymbolBrowser from "../components/markets/SymbolBrowser";
+import ForecastInfo from "../components/markets/ForecastInfo";
 import { useSSE } from "../hooks/useSSE";
 import { useLanguage } from "../contexts/LanguageContext";
 import type { UIStrings } from "../i18n/strings";
@@ -143,8 +145,8 @@ export default function MarketsPage() {
 
           {/* Master-detail dashboard: watchlist | chart + insights | forecasts */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-            {/* Watchlist */}
-            <div className="flex min-w-0 flex-col">
+            {/* Watchlist + full symbol browser */}
+            <div className="flex min-w-0 flex-col gap-4">
               <Panel title={t.watchlist}>
                 <PriceTicker
                   latestTick={latestPriceTick}
@@ -152,6 +154,9 @@ export default function MarketsPage() {
                   selectedSymbol={selected.symbol}
                   onSelectSymbol={handleSelect}
                 />
+              </Panel>
+              <Panel title={t.symbolBrowser}>
+                <SymbolBrowser onSelect={handleSelect} selectedSymbol={selected.symbol} />
               </Panel>
             </div>
 
@@ -173,7 +178,8 @@ export default function MarketsPage() {
             </div>
 
             {/* Forecasts & insights — drops below center on md, sidebar on xl */}
-            <div className="flex min-w-0 flex-col lg:col-span-2 xl:col-span-1">
+            <div className="flex min-w-0 flex-col gap-4 lg:col-span-2 xl:col-span-1">
+              <ForecastInfo />
               <Panel title={t.marketForecasts}>
                 <ForecastPanel embedded />
               </Panel>

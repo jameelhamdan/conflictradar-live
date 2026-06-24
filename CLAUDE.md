@@ -273,6 +273,9 @@ This is a real-time global event intelligence platform. Key feature areas:
 - `PriceTick` — price samples; fields: `symbol`, `stream_key` (crypto/stock/commodity/forex/bond), `value`, `change_pct`, `volume`, `occurred_at`; 1-year TTL in production
 - `PriceBar` — daily OHLC (forecasting substrate, no TTL); fields: `symbol`, `stream_key`, `name`, `interval` (`1d`), `open/high/low/close`, `volume`, `date`; backfilled via `services/forecasting/history.py`
 - `Forecast` — model-backed forecast (one per symbol+horizon); fields: `symbol`, `stream_key`, `generated_at`, `as_of_date`, `horizon_days` (1\|5), `direction`, `proba_up`, `predicted_change_pct`, `predicted_price`, `band_low/high`, `confidence`, `current_value`, `router_source` (llm/rules), `model_version`, `realized_direction/change_pct`, `is_correct`, `scored_at`
+- `MarketSymbol` — **single source of truth** for fetched/forecast/UI symbols (replaces hardcoded symbol lists). Fields: `symbol` (unique), `name`, `stream_key`, `provider` (yahoo/coingecko/ecb), `provider_id`, `group`, `is_active` (fetched by streams), `is_forecast` (forecasting panel target), `is_popular`+`rank`, `display_order`, `metadata`. Read via `services/market_symbols.py` helpers (graceful fallback to hardcoded defaults if empty). Seeded by migration `0006`. See [docs/symbols.md](docs/symbols.md).
+- `TaskRun` — one row per task execution (status, duration, item count, error, job_id), written centrally by the `_execute_tracked` wrapper in `services/queue.py`. Data source for the admin operations dashboard. Migration `0007`.
+- `Article.stage_status` / `Event.stage_status` — per-record `{stage: {ok, at, error}}` written by `services/stages.py::mark_stage` (Article: `process`/`geocode`; Event: `tag`/`route`). Feeds `Workflow.pipeline_coverage()`. Migration `0008`.
 - `misc` app contains only `EmailLog` model — admin panel for monitoring sent emails
 - `Subscriber` in `newsletter/models.py` — fields: `email` (unique), `token` (UUID), `subscribed_at`, `confirmed_at` (nullable), `is_active`, `unsubscribed_at`; lifecycle: pending → confirmed → unsubscribed
 
@@ -756,6 +759,10 @@ Stream tasks (default queue, independent of pipeline):
 | `HEALTH_CHECK_INTERVAL_MINUTES` | `30` | `pipeline_health_task` period (logs warnings on stale outputs) |
 | `HEALTH_ARTICLE_STALE_MIN` / `HEALTH_PRICE_STALE_MIN` / `HEALTH_QUAKE_STALE_MIN` | `180` / `60` / `360` | Staleness thresholds for the health monitor |
 | `JOB_TIMEOUT_SECONDS` | `1800` | RQ job timeout (30m) — passed to `enqueue()` and `setup_schedule` |
+| `PROCESS_CHUNK_SIZE` | `1` | Articles per `process` fan-out worker job (>1 batches cheap records) |
+| `PROCESS_DISPATCH_LIMIT` / `TAG_DISPATCH_LIMIT` / `ROUTE_DISPATCH_LIMIT` | `500` | Per-tick fan-out cap so a cold start doesn't flood the queue |
+| `STUCK_RECOVERY_INTERVAL_MINUTES` | `360` | Safety-net re-dispatch of processed-but-unlocated articles |
+| `BOOTSTRAP_ARTICLE_YEARS` | `1` | First-load article-backfill window (`bootstrap_initial_data_task`) |
 | `AWS_ACCESS_KEY_ID` | — | AWS SES credentials |
 | `AWS_SECRET_ACCESS_KEY` | — | AWS SES credentials |
 | `AWS_SES_REGION` | `us-east-1` | AWS SES region |
@@ -800,6 +807,10 @@ Stream tasks (default queue, independent of pipeline):
 - **LLM responses: always strip code fences**: use `re.sub(r'^```(?:json)?\s*', '', r)` + `re.sub(r'\s*```$', '', r)` before `json.loads()`. All LLM-calling code in the project does this — do not omit it in new code.
 - **LLM routing**: call `get_llm_service(role)` with the use-case role (`analyzer`, `topics`, `newsletter`, `historical`; unknown → `default`). Routes live in `settings.LLM_ROUTES` (dict in `settings/base.py`) — a provider name or an ordered fallback list (`FallbackLLMService` tries each on `LLMError`). Per-provider config (keys/base_url/model) is in `.env`; the who-uses-what routing is in code. There is no `LLM_BACKEND` / `LLM_PROVIDER` var anymore.
 - **Static points bootstrap**: run `python manage.py bootstrap_static_points` once to seed `StaticPoint` (exchanges, ports, central banks)
+- **Configurationless deploy**: `docker compose up` self-seeds + self-backfills via `bootstrap_initial_data_task` (triggered by `setup_schedule`, idempotent). No manual `bootstrap_static_points` needed in fresh deploys. See [docs/operations.md](docs/operations.md).
+- **Fan-out pipeline**: process/tag/route are light **dispatcher** tasks (`dispatch_*`, default queue) that enqueue idempotent per-record **workers** (`process_article_task`, `tag_events_chunk_task`, `route_events_chunk_task`, etc.) on the heavy queue. Scale via `worker-heavy` replicas. The admin "Run full pipeline" button still uses the sequential `run_pipeline_task`.
+- **Symbols are DB-driven**: never hardcode symbol lists — add a `MarketSymbol` row and read via `services/market_symbols.py`. The forecasting panel is `MarketSymbol.is_forecast` (5 base symbols: `CL=F, GC=F, BTC-USD, SPY, EURUSD=X`); changing it requires a retrain (auto on next daily `train_forecast_model_task`).
+- **Ops dashboard**: `/admin/dashboard/` (throughput/coverage/upcoming/in-flight/forecast status + reprocess/cancel actions). Every task run is recorded as a `TaskRun` by the `_execute_tracked` wrapper — including scheduled jobs (scheduled via `_execute_tracked` in `setup_schedule`).
 
 ---
 
@@ -876,6 +887,15 @@ python manage.py generate_newsletter --date 2025-03-08
 
 # Send newsletter for a date
 python manage.py send_newsletter --date 2025-03-08
+
+# Full-system e2e TEST with real data — asserts invariants across every part
+# (symbols, fan-out fetch/process/tag/route, TaskRun tracking, stage_status, coverage,
+#  forecasting, REST API, dashboard, bootstrap guard). Exits non-zero on hard failure.
+python manage.py e2e_full                                  # real RSS + NLP + prices + API
+python manage.py e2e_full --fast                          # structural checks only (no network/LLM)
+python manage.py e2e_full --source guardian-world --years 2 --skip-forecast
+# Report → ./e2e_full_<timestamp>.json (per-check PASS/FAIL/WARN). Requires the live
+# Mongo + Redis stack; forces synchronous fan-out so no RQ workers are needed.
 
 # Run the full pipeline end-to-end and write a JSON report for manual inspection
 python manage.py e2e_pipeline                              # default: 6h fetch, 24h window, 5 samples

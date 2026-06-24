@@ -2,7 +2,7 @@ from rest_framework import serializers
 from core.models import (
     Article, Event, Source,
     PriceTick, PriceBar, Forecast, NotamRecord, NotamZone, EarthquakeRecord, StaticPoint,
-    Topic,
+    Topic, MarketSymbol,
 )
 from newsletter.models import DailyNewsletter
 
@@ -130,6 +130,18 @@ class StaticPointSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'code', 'point_type', 'name', 'country', 'country_code',
             'latitude', 'longitude', 'metadata', 'is_active',
+        ]
+
+
+class MarketSymbolSerializer(serializers.ModelSerializer):
+    """Curated market symbol (config + Markets UI metadata)."""
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = MarketSymbol
+        fields = [
+            'id', 'symbol', 'name', 'stream_key', 'provider', 'group',
+            'is_active', 'is_forecast', 'is_popular', 'rank', 'display_order',
         ]
 
 
