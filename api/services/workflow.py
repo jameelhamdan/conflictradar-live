@@ -749,22 +749,18 @@ class Workflow:
                     loc = ctx[len('ongoing armed conflict. location:'):].strip().rstrip('.')
                     ctx = f'Location: {loc}'
                 line = (
-                    f'{i + 1}. slug={t["slug"]}'
-                    f' | name={t.get("name") or t["slug"]}'
-                    f' | category={t.get("category") or "general"}'
+                    f'{i + 1}. {t.get("name") or t["slug"]}'
+                    f' ({t.get("category") or "general"}) [slug:{t["slug"]}]'
                 )
                 if ctx:
-                    line += f' | context={ctx[:120]}'
+                    line += f' — {ctx[:80]}'
                 lines.append(line)
 
             prompt = (
-                'You are a news analyst. For each topic below, write a concise 1–2 sentence '
-                'description and list 8–15 relevant keywords that would appear in news headlines '
-                'about it (people, places, organisations, terms).\n\n'
+                'News analyst. For each topic: 1-2 sentence description + 8-15 keywords'
+                ' (people, places, orgs, terms).\n\n'
                 'TOPICS:\n' + '\n'.join(lines) + '\n\n'
-                'Return a JSON array in the same order, one object per topic:\n'
-                '[{"slug": "...", "description": "...", "keywords": ["kw1", "kw2", ...]}, ...]\n'
-                'Respond with only the JSON array, no other text.'
+                'JSON array: [{"slug":"...","description":"...","keywords":["kw1",...]}, ...]\nJSON only.'
             )
 
             try:
@@ -1005,15 +1001,10 @@ class Workflow:
         for (category, country), events in candidates:
             titles_sample = '\n'.join(f'- {e.title}' for e in events[:10])
             prompt = (
-                f'You are a news analyst. The following events all occurred in {country} '
-                f'and are categorized as "{category}". They have not been matched to any '
-                f'known topic yet.\n\nEvent titles:\n{titles_sample}\n\n'
-                f'If these events share a coherent ongoing news topic, respond with a JSON '
-                f'object with fields: slug (kebab-case, max 80 chars), name (concise, max 80 chars), '
-                f'keywords (list of 5-15 relevant keywords), category (one of: '
-                f'{", ".join(sorted(valid_categories))}), description (1-2 sentences).\n'
-                f'If no coherent topic exists, respond with null.\n'
-                f'Respond with only the JSON object or null, no other text.'
+                f'Events in {country}, category "{category}":\n{titles_sample}\n\n'
+                f'If they share a coherent ongoing topic: {{"slug":"kebab-case","name":"short name",'
+                f'"keywords":["5-15 terms"],"category":"{category}","description":"1-2 sentences"}}\n'
+                f'If no coherent topic: null\nJSON only.'
             )
 
             try:

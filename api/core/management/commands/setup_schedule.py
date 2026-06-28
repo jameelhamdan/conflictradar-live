@@ -12,7 +12,7 @@ heavy    — NLP / LLM tasks (processing, clustering, topic matching)
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import django_rq
 from django.conf import settings
@@ -43,7 +43,6 @@ class Command(BaseCommand):
             dispatch_fetch_task,
             dispatch_process_articles_task,
             dispatch_route_events_task,
-            dispatch_tag_topics_task,
             fetch_earthquakes_task,
             fetch_forex_task,
             fetch_notams_task,
@@ -63,10 +62,8 @@ class Command(BaseCommand):
 
         cron_timeout = int(os.getenv('JOB_TIMEOUT_SECONDS', '1800'))
 
-        def sched(scheduler, when, func, *, interval=None, repeat=None,
-                  timeout=None, kwargs=None):
-            scheduler.schedule(when, func, kwargs=kwargs or {},
-                               interval=interval, repeat=repeat, timeout=timeout)
+        def sched(scheduler, when, func, *, interval=None, repeat=None, timeout=None, kwargs=None):
+            scheduler.schedule(when, func, kwargs=kwargs or {}, interval=interval, repeat=repeat, timeout=timeout)
 
         def cron(scheduler, cron_string, func, *, repeat=None, timeout=None):
             scheduler.cron(cron_string, func, repeat=repeat, timeout=timeout)
@@ -104,29 +101,27 @@ class Command(BaseCommand):
         sched(light, now, pipeline_health_task, interval=health_interval, timeout=_interval_timeout(health_interval))
 
         # ── NLP / LLM — light dispatchers fan out to per-record heavy workers ──
-        process_interval  = _minutes('PROCESS_INTERVAL_MINUTES', '60')
-        aggregate_interval = _minutes('AGGREGATE_INTERVAL_MINUTES', '60')
-        tag_interval      = _minutes('TAG_TOPICS_INTERVAL_MINUTES', '75')
-        discover_interval = _minutes('DISCOVER_TOPICS_INTERVAL_MINUTES', '150')
-        recover_interval  = _minutes('STUCK_RECOVERY_INTERVAL_MINUTES', '360')
+        process_interval   = _minutes('PROCESS_INTERVAL_MINUTES', '240')
+        aggregate_interval = _minutes('AGGREGATE_INTERVAL_MINUTES', '240')
+        recover_interval   = _minutes('STUCK_RECOVERY_INTERVAL_MINUTES', '720')
 
         sched(light, now, dispatch_process_articles_task, interval=process_interval, timeout=_interval_timeout(process_interval))
         sched(heavy, now, aggregate_events_task,          interval=aggregate_interval, timeout=_interval_timeout(aggregate_interval))
-        sched(light, now, dispatch_tag_topics_task,       interval=tag_interval,   timeout=_interval_timeout(tag_interval))
-        sched(heavy, now, discover_topics_task,           interval=discover_interval, timeout=_interval_timeout(discover_interval))
         sched(light, now, dispatch_process_articles_task, kwargs={'only_failed': True},
               interval=recover_interval, timeout=_interval_timeout(recover_interval))
 
         # ── Cron jobs (heavy — daily LLM runs) ────────────────────────────────
         refresh_hour    = int(os.getenv('TOPICS_REFRESH_HOUR', '4'))
+        discover_hour   = int(os.getenv('DISCOVER_TOPICS_HOUR', '5'))
         newsletter_hour = int(os.getenv('NEWSLETTER_GENERATE_HOUR', '6'))
-        cron(heavy, f'0 {refresh_hour} * * *',    refresh_topics_task,      timeout=cron_timeout)
+        cron(heavy, f'0 {refresh_hour} * * *',   refresh_topics_task,   timeout=cron_timeout)
+        cron(heavy, f'0 {discover_hour} * * *',  discover_topics_task,  timeout=cron_timeout)
         if settings.NEWSLETTER_ENABLED:
             cron(heavy, f'0 {newsletter_hour} * * *', generate_newsletter_task, timeout=cron_timeout)
 
         # ── Article importance scoring + cleanup ──────────────────────────────
         if settings.ARTICLE_IMPORTANCE_SCORING_ENABLED:
-            score_interval = _minutes('SCORE_INTERVAL_MINUTES', '15')
+            score_interval = _minutes('SCORE_INTERVAL_MINUTES', '60')
             sched(heavy, now, score_articles_task, interval=score_interval,
                   timeout=_interval_timeout(score_interval))
             cron(light, '0 3 * * *', cleanup_low_importance_articles_task, timeout=cron_timeout)
@@ -138,8 +133,8 @@ class Command(BaseCommand):
             week = 7 * 24 * 60 * 60
             # Price backfill + model training are long jobs → bulk queue (the first
             # price run pulls full 10y history; weekly runs are incremental).
-            sched(bulk, now, backfill_prices_task, interval=week, timeout=-1)
-            route_interval = _minutes('ROUTE_EVENTS_INTERVAL_MINUTES', '90')
+            sched(bulk, now + timedelta(seconds=week), backfill_prices_task, interval=week, timeout=-1)
+            route_interval = _minutes('ROUTE_EVENTS_INTERVAL_MINUTES', '360')
             sched(light, now, dispatch_route_events_task, interval=route_interval,
                   timeout=_interval_timeout(route_interval))
             train_hour = int(os.getenv('FORECAST_TRAIN_HOUR', '5'))

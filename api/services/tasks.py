@@ -56,7 +56,10 @@ def aggregate_events_task(
     hours: int = DEFAULT_AGGREGATE_HOURS,
     min_articles: int = DEFAULT_AGGREGATE_MIN_ARTICLES,
 ) -> tuple[int, int]:
-    return Workflow.aggregate_events(hours=hours, min_articles=min_articles)
+    result = Workflow.aggregate_events(hours=hours, min_articles=min_articles)
+    from services.queue import enqueue
+    enqueue(dispatch_tag_topics_task, hours, queue='default')
+    return result
 
 
 def run_pipeline_task(

@@ -292,19 +292,28 @@ ARTICLE_DEDUP_TITLE_ENABLED = config('ARTICLE_DEDUP_TITLE_ENABLED', default=True
 ARTICLE_DEDUP_JACCARD_THRESHOLD = config('ARTICLE_DEDUP_JACCARD_THRESHOLD', default=0.75, cast=float)
 ARTICLE_DEDUP_HOURS = config('ARTICLE_DEDUP_HOURS', default=24, cast=int)
 
-# Ollama (self-hosted, no key)
+# Ollama (self-hosted, no key) — local 14B model serving every role.
 OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='http://localhost:11434')
-OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3:4b')
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3:14b')
 
 # Routing: role -> provider name OR ordered fallback list (tried in order on failure).
 # Unconfigured providers are skipped; unknown roles fall back to 'default'.
+#
+# All roles run on the local Ollama 14B model, with OpenRouter as the fallback if
+# Ollama is unreachable or errors. qwen3:14b is strong enough for the quality-
+# sensitive roles (EN+AR translations, newsletter prose) as well as the high-volume
+# structured roles (scoring, topic/event routing).
+_OLLAMA = ['ollama', 'openrouter']
+_OPENROUTER = ['openrouter', 'ollama']
 LLM_ROUTES = {
-    'default': 'openrouter',
-    'scoring': 'openrouter',  # article importance scoring (score_articles_task)
-
-    # Override per role if needed. Available roles: analyzer, topics, newsletter,
-    # historical, routing, scoring. Example with Ollama fallback:
-    #   'analyzer': ['ollama', 'openrouter'],
+    'default': _OLLAMA,
+    'analyzer': _OLLAMA,       # full analysis incl. EN+AR translations (live feed)
+    'analyzer_lite': _OLLAMA,  # English-only analysis (backfill, no AR)
+    'newsletter': _OPENROUTER,     # long-form prose generation
+    'scoring': _OLLAMA,        # 1–10 headline importance rating
+    'historical': _OLLAMA,     # backfill significance scoring
+    'topics': _OLLAMA,         # event → topic matching (batch)
+    'routing': _OLLAMA,        # event → symbol routing (batch)
 }
 
 # ── Forecasting (event-fused symbol prediction) ───────────────────────────────

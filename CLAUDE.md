@@ -327,15 +327,15 @@ All periodic jobs are registered by the `setup_schedule` management command (`ap
 | `fetch_earthquakes_task` | 5m | `EARTHQUAKE_FETCH_INTERVAL_MINUTES` |
 | `fetch_forex_task` | 15m | `FOREX_FETCH_INTERVAL_MINUTES` |
 
-**Heavy queue — NLP/LLM (5× base interval by default):**
+**Heavy queue — NLP/LLM:**
 
 | Task | Default interval | Env var |
 |---|---|---|
-| `process_articles_task` | 60m | `PROCESS_INTERVAL_MINUTES` |
-| `aggregate_events_task` | 60m | `AGGREGATE_INTERVAL_MINUTES` |
-| `tag_topics_task` | 75m | `TAG_TOPICS_INTERVAL_MINUTES` |
-| `discover_topics_task` | 150m | `DISCOVER_TOPICS_INTERVAL_MINUTES` |
-| `score_articles_task` | 15m | `SCORE_INTERVAL_MINUTES` |
+| `process_articles_task` | 240m | `PROCESS_INTERVAL_MINUTES` |
+| `aggregate_events_task` | 240m | `AGGREGATE_INTERVAL_MINUTES` |
+| `score_articles_task` | 60m | `SCORE_INTERVAL_MINUTES` |
+
+**Note:** `tag_topics_task` is not scheduled independently — it is enqueued automatically by `aggregate_events_task` on completion, using the same `hours` window. There is no `TAG_TOPICS_INTERVAL_MINUTES` env var.
 
 **Light queue (`default`) — maintenance:**
 
@@ -350,7 +350,15 @@ All periodic jobs are registered by the `setup_schedule` management command (`ap
 | Task | Schedule | Env var |
 |---|---|---|
 | `refresh_topics_task` | daily at 04:00 UTC | `TOPICS_REFRESH_HOUR` |
+| `discover_topics_task` | daily at 05:00 UTC | `DISCOVER_TOPICS_HOUR` |
 | `generate_newsletter_task` | daily at 06:00 UTC | `NEWSLETTER_GENERATE_HOUR` |
+
+**Forecasting (bulk queue):**
+
+| Task | Default interval | Env var |
+|---|---|---|
+| `dispatch_route_events_task` | 360m | `ROUTE_EVENTS_INTERVAL_MINUTES` |
+| `backfill_prices_task` | weekly (first run: 1 week after deploy) | — |
 
 Task functions are scheduled directly — `scheduler.schedule(when, func, ...)` — with no wrapper. Return values flow into RQ's job result store and appear in `/admin/django-rq/`.
 
@@ -747,35 +755,36 @@ fetch_articles_task (every 10m, default queue, timeout 30m)
      Title dedup: Jaccard ≥ 0.75 against 24h Redis window (ARTICLE_DEDUP_TITLE_ENABLED)
      Word count filter: articles below ARTICLE_MIN_WORD_COUNT (30) are rejected
 
-score_articles_task (every 15m, heavy queue, timeout 30m)
+score_articles_task (every 60m, heavy queue, timeout 30m)
   └─ ArticleImportanceScorer:
-       LLM (role='scoring') batch 1–10 ratings → importance_score + source.weight multiplier
+       LLM (role='scoring') batch scores as plain float array → importance_score + source.weight multiplier
        + cross-source corroboration bonus (+0.5 per corroborating source, max +2.0)
        + per-category floor (conflict/disaster ≥ 6.0, political/economic ≥ 4.0)
      Only unscored articles (importance_score__isnull=True) in the last SCORE_INTERVAL_MINUTES×2 window
 
-process_articles_task (every 60m, heavy queue, timeout 30m)
+process_articles_task (every 240m, heavy queue, timeout 30m)
   └─ bert-base-NER + VADER & FinBERT sentiment + geonamescache geocoding → Article metadata
      LLM: category + sub-category assignment
-     LLM: English + Arabic translations → Article.translations
+     LLM: English + Arabic translations → Article.translations (backfill: English only)
 
-aggregate_events_task (every 60m, heavy queue, timeout 30m)
+aggregate_events_task (every 240m, heavy queue, timeout 30m)
   └─ Bucket by (city, country, category, date)
      → semantic sub-cluster via SemanticClusterer (cosine similarity ≥ 0.55)
      → upsert Event objects in MongoDB keyed on (location_name, category, day)
+     → on completion: enqueues dispatch_tag_topics_task (default queue, same hours window)
 
-tag_topics_task (every 75m, heavy queue, timeout 30m)
+tag_topics_task (triggered by aggregate_events_task, heavy queue)
   └─ LLMTopicMatcher (batch, 10 events/call) → sets Event.topic_slugs
      Falls back to TopicMatcher per-event on LLM error
-
-discover_topics_task (every 150m, heavy queue, timeout 30m)
-  └─ LLM discovers new topics from recent events → creates Topic objects
 
 refresh_topics_task (daily 04:00 UTC, heavy queue, timeout 30m)
   └─ WikipediaCurrentEventsAdapter (Portal:Current_events, last 30 days)
      → deduplicate_topics → semantic_merge_topics (threshold=0.85)
      → _enrich_topics (LLM: descriptions + expanded keywords, batch 30)
      → upsert Topic objects; mark stale topics is_current=False
+
+discover_topics_task (daily 05:00 UTC, heavy queue, timeout 30m)
+  └─ LLM discovers new topics from recent untagged events → creates Topic objects
 
 generate_newsletter_task (daily 06:00 UTC, heavy queue, timeout 30m)
   └─ LLM-based newsletter draft → DailyNewsletter.body (Markdown)
@@ -827,13 +836,12 @@ Stream tasks (default queue, independent of pipeline):
 | `OPENROUTER_PROXY_VALIDATE_TIMEOUT` | `5` | Per-proxy HEAD request timeout (seconds) during validation |
 | `OPENROUTER_PROXY_MAX_POOL` | `100` | Maximum working proxies kept in rotation after validation |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `qwen3:4b` | Ollama model name |
+| `OLLAMA_MODEL` | `qwen3:14b` | Ollama model name |
 | `FETCH_INTERVAL_MINUTES` | `10` | fetch_articles_task period |
-| `PROCESS_INTERVAL_MINUTES` | `10` | process_articles_task base period (×6 for heavy queue = 60m) |
-| `AGGREGATE_INTERVAL_MINUTES` | `10` | aggregate_events_task base period (×6 = 60m) |
-| `TAG_TOPICS_INTERVAL_MINUTES` | `15` | tag_topics_task base period (×5 = 75m) |
-| `DISCOVER_TOPICS_INTERVAL_MINUTES` | `30` | discover_topics_task base period (×5 = 150m) |
+| `PROCESS_INTERVAL_MINUTES` | `240` | process_articles_task period |
+| `AGGREGATE_INTERVAL_MINUTES` | `240` | aggregate_events_task period |
 | `TOPICS_REFRESH_HOUR` | `4` | Hour (UTC) for daily refresh_topics_task |
+| `DISCOVER_TOPICS_HOUR` | `5` | Hour (UTC) for daily discover_topics_task |
 | `TOPIC_SOURCES_DAYS` | `30` | Wikipedia Current Events lookback window (days) |
 | `TOPIC_STALE_DAYS` | `90` | Topics with no tagged events in this window are auto-hidden from the header (`Workflow.prune_stale_topics`, runs in `refresh_topics`) |
 | `PRICE_FETCH_INTERVAL_MINUTES` | `5` | fetch_prices_task period |
@@ -859,7 +867,8 @@ Stream tasks (default queue, independent of pipeline):
 | `JOB_TIMEOUT_SECONDS` | `1800` | RQ job timeout (30m) — passed to `enqueue()` and `setup_schedule` |
 | `PROCESS_CHUNK_SIZE` | `1` | Articles per `process` fan-out worker job (>1 batches cheap records) |
 | `PROCESS_DISPATCH_LIMIT` / `TAG_DISPATCH_LIMIT` / `ROUTE_DISPATCH_LIMIT` | `500` | Per-tick fan-out cap so a cold start doesn't flood the queue |
-| `STUCK_RECOVERY_INTERVAL_MINUTES` | `360` | Safety-net re-dispatch of processed-but-unlocated articles |
+| `ROUTE_EVENTS_INTERVAL_MINUTES` | `360` | dispatch_route_events_task period |
+| `STUCK_RECOVERY_INTERVAL_MINUTES` | `720` | Safety-net re-dispatch of processed-but-unlocated articles |
 | `BOOTSTRAP_ARTICLE_YEARS` | `1` | First-load article-backfill window (`bootstrap_initial_data_task`) |
 | `ARTICLE_IMPORTANCE_SCORING_ENABLED` | `true` | Feature flag — gates `score_articles_task` + schedule |
 | `ARTICLE_MIN_IMPORTANCE` | `3.0` | Articles below this score are flagged for cleanup by `cleanup_low_importance_articles_task` |
@@ -870,7 +879,7 @@ Stream tasks (default queue, independent of pipeline):
 | `ARTICLE_DEDUP_JACCARD_THRESHOLD` | `0.75` | Jaccard overlap threshold for title dedup (0.0–1.0) |
 | `ARTICLE_DEDUP_HOURS` | `24` | Rolling window (hours) for the title dedup cache |
 | `ARTICLE_STALE_PROCESSED_DAYS` | `90` | Processed articles older than this with no event may be pruned by `prune_stale_articles_task` |
-| `SCORE_INTERVAL_MINUTES` | `3` | `score_articles_task` base period (×5 on heavy queue = 15m) |
+| `SCORE_INTERVAL_MINUTES` | `60` | `score_articles_task` period |
 | `AWS_ACCESS_KEY_ID` | — | AWS SES credentials |
 | `AWS_SECRET_ACCESS_KEY` | — | AWS SES credentials |
 | `AWS_SES_REGION` | `us-east-1` | AWS SES region |
@@ -890,6 +899,9 @@ Stream tasks (default queue, independent of pipeline):
 - **Aggregation needs a location**: `aggregate_events` only buckets articles with a non-empty `Article.location` and `published_on` within the window. An article whose LLM/geo step failed is saved with `processed_on` set but `location=None` → it **never aggregates**, and `process_articles` won't retry it (skips already-processed rows). Recover with `process_articles(only_failed=True)` (admin: **"Reprocess un-located"**); `aggregate_events` logs how many in-window articles it skipped for missing location.
 - **Two queues**: `default` for fast I/O, `heavy` for NLP/LLM. New NLP/LLM tasks must pass `queue='heavy'` to `enqueue()` and `setup_schedule`
 - **Schedule is stored in Redis**: `setup_schedule` clears and re-registers all jobs on every `scheduler` container start — this is intentional and idempotent
+- **`backfill_prices_task` first run is deferred**: scheduled at `now + 1 week`, not `now` — so restarting the scheduler does not trigger an immediate multi-year price backfill. Trigger manually with `python manage.py backfill_prices` when needed.
+- **`tag_topics_task` has no independent schedule**: it is enqueued by `aggregate_events_task` on completion. Do not add it back to `setup_schedule` — it would race aggregate and tag stale events unnecessarily.
+- **`discover_topics_task` is a daily cron**: runs once at `DISCOVER_TOPICS_HOUR` (default 05:00 UTC). Do not restore the old interval schedule — daily is sufficient and avoids redundant LLM calls.
 - **Restart scheduler to change intervals**: edit the env var and restart the `scheduler` service; it re-runs `setup_schedule` automatically
 - **App names**: Django apps use simple names (`'core'`, `'accounts'`, `'api'`, `'newsletter'`, `'misc'`) — no path prefix
 - **Model imports**: use `from core import models as core_models` — never bare `import core.models`

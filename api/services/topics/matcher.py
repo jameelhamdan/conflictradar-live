@@ -110,7 +110,7 @@ class LLMTopicMatcher:
         # Build prompt fragments shared across all batches
         situation_lines = '\n'.join(
             f'- {t.slug}: {t.name}'
-            + (f' — {t.description[:120]}' if getattr(t, 'description', '') else '')
+            + (f' — {t.description[:60]}' if getattr(t, 'description', '') else '')
             for t in topics
         )
         valid_slugs = {t.slug for t in topics}
@@ -144,7 +144,7 @@ class LLMTopicMatcher:
                 response = llm.chat(
                     [{'role': 'user', 'content': prompt}],
                     temperature=0,
-                    max_tokens=min(1800, 80 * len(batch) + 200),
+                    max_tokens=min(600, 40 * len(batch) + 100),
                 ).strip()
                 response = strip_code_fences(response)
                 batch_result = json.loads(response)

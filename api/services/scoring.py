@@ -20,13 +20,11 @@ from services.text_utils import tokenize as _tokenize, jaccard as _jaccard
 logger = logging.getLogger(__name__)
 
 _SCORE_PROMPT_HEADER = (
-    'Rate each news headline by global significance on a scale of 1.0–10.0.\n'
-    'Consider: geopolitical impact, affected population, economic consequences, novelty.\n\n'
+    'Rate each headline 1.0–10.0 by global significance'
+    ' (geopolitical impact, population affected, economic scale, novelty).\n\n'
 )
 _SCORE_PROMPT_FOOTER = (
-    '\n\nReturn a JSON array — one object per headline:\n'
-    '[{"i": 1, "score": 7.5}, {"i": 2, "score": 4.0}, ...]\n'
-    'Return only the JSON array, no other text.'
+    '\n\nReturn a JSON array of scores in order, one float per headline: [7.5, 4.0, ...]'
 )
 
 # Applied only when article.category is already set (i.e. after NLP has run).
@@ -112,15 +110,13 @@ class ArticleImportanceScorer:
                     raw[:120], self.DEFAULT_SCORE,
                 )
                 return default
-            data      = json.loads(match.group(0))
-            score_map = {int(item['i']): float(item['score']) for item in data}
-            missing   = set(range(1, len(titles) + 1)) - score_map.keys()
-            if missing:
-                logger.warning(
-                    'LLM importance score index mismatch: missing %s; using %.1f',
-                    sorted(missing), self.DEFAULT_SCORE,
-                )
-            return [score_map.get(i + 1, self.DEFAULT_SCORE) for i in range(len(titles))]
+            data = json.loads(match.group(0))
+            if not isinstance(data, list):
+                return default
+            return [
+                float(data[i]) if i < len(data) else self.DEFAULT_SCORE
+                for i in range(len(titles))
+            ]
         except LLMError as exc:
             logger.warning('LLM importance scoring failed (%s); using %.1f', exc, self.DEFAULT_SCORE)
             return default

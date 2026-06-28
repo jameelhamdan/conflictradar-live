@@ -48,29 +48,25 @@ _OBJECT_SCHEMA_LITE = """\
 }"""
 
 _CATEGORY_GUIDE = """\
-Pick the best top-level category, then the most specific sub-category:
-- conflict  [war|airstrike|insurgency|terrorism|border-clash|other]: any deliberate armed/military action — strikes, drones, shelling, clashes, terrorism. Country A attacking Country B is ALWAYS conflict, even with explosions, fires, or mass casualties.
-- disaster  [earthquake|flood|storm|wildfire|industrial-accident|other]: natural catastrophe OR a purely accidental industrial event (factory blast, spill, pipeline leak) with NO armed aggressor.
-- economic  [monetary-policy|energy|trade|tariffs|labor|markets|sanctions|other]: finance, central-bank/rate decisions, trade, tariffs, labor, markets, energy policy, sanctions.
-- political [election|legislation|diplomacy|leadership-change|protest-policy|other]: government decisions, summits, elections, legislation, leadership changes, coups, protests/strikes (use protest-policy).
-- health    [outbreak|pandemic|healthcare-system|other]: disease outbreaks, epidemics, public-health/healthcare news.
-- general   [other]: anything else, including ordinary crime not involving military actors.
-
-conflict vs disaster: caused by a deliberate armed/military action? YES → conflict (even if buildings burned or people died); NO → disaster."""
+Category + sub-category:
+- conflict [war|airstrike|insurgency|terrorism|border-clash|other]: deliberate armed/military action. Always conflict if an aggressor is present, even with casualties or explosions.
+- disaster [earthquake|flood|storm|wildfire|industrial-accident|other]: natural or accidental — no armed aggressor.
+- economic [monetary-policy|energy|trade|tariffs|labor|markets|sanctions|other]
+- political [election|legislation|diplomacy|leadership-change|protest-policy|other]
+- health [outbreak|pandemic|healthcare-system|other]
+- general [other]: anything else, incl. ordinary crime.
+Rule: deliberate armed action → conflict; accidental/natural → disaster."""
 
 def _single_prompt(schema: str) -> str:
     return (
-        'You are a news article analyzer. Respond with a single valid JSON object — '
-        'no markdown, no explanation, just JSON.\n\nSchema:\n'
+        'News article analyzer. JSON only (no markdown).\n\nSchema:\n'
         + schema + '\n\n' + _CATEGORY_GUIDE
     )
 
 
 def _batch_prompt(schema: str) -> str:
     return (
-        'You are a news article analyzer. You will receive several numbered articles. '
-        'Respond with a JSON array of one object per article, IN THE SAME ORDER — '
-        'no markdown, no explanation, just the JSON array.\n\nEach object schema:\n'
+        'News article analyzer. Numbered articles → JSON array, same order, JSON only.\n\nEach object:\n'
         + schema + '\n\n' + _CATEGORY_GUIDE
     )
 
@@ -230,7 +226,21 @@ class ArticleAnalyzer:
 
     def __init__(self) -> None:
         from services.llm import get_llm_service
-        self._llm = get_llm_service('analyzer')
+        self._get_llm_service = get_llm_service
+        # Two routes by complexity: full (EN+AR) → 'analyzer' (OpenRouter);
+        # lite (English-only backfill) → 'analyzer_lite' (local Ollama 7B, OR fallback).
+        # Resolved lazily and cached so an unused route never instantiates a client.
+        self._llm_full = None
+        self._llm_lite = None
+
+    def _service(self, translate: bool):
+        if translate:
+            if self._llm_full is None:
+                self._llm_full = self._get_llm_service('analyzer')
+            return self._llm_full
+        if self._llm_lite is None:
+            self._llm_lite = self._get_llm_service('analyzer_lite')
+        return self._llm_lite
 
     @staticmethod
     def _empty() -> ArticleAnalysis:
@@ -251,7 +261,7 @@ class ArticleAnalyzer:
         system = _SYSTEM_PROMPT if translate else _SYSTEM_PROMPT_LITE
         per = self._OUTPUT_PER_ARTICLE if translate else self._OUTPUT_PER_ARTICLE_LITE
         try:
-            raw = self._llm.chat(
+            raw = self._service(translate).chat(
                 messages=[
                     {'role': 'system', 'content': system},
                     {'role': 'user', 'content': text[: self._MAX_CHARS]},
@@ -286,7 +296,7 @@ class ArticleAnalyzer:
             f'[{i + 1}]\n{t[: self._MAX_CHARS]}' for i, t in enumerate(chunk)
         )
         try:
-            raw = self._llm.chat(
+            raw = self._service(translate).chat(
                 messages=[
                     {'role': 'system', 'content': system},
                     {'role': 'user', 'content': user},

@@ -149,14 +149,11 @@ def generate_newsletter(date_str: str | None = None) -> str:
     )
 
     prompt_user = (
-        f"Today is {target_date.strftime('%B %d, %Y')}. "
-        f"Here are today's {len(events)} global news events grouped by category:\n\n"
+        f"Date: {target_date}. {len(events)} global events by category:\n\n"
         f"{events_text}\n\n"
-        "Write a daily geopolitical intelligence newsletter. "
-        "For each category above, write one concise factual paragraph (3-5 sentences). "
-        "Skip any category that has no meaningful developments. "
-        "Respond with ONLY a JSON object (no markdown, no explanation):\n"
-        '{"subject": "<compelling headline, max 80 chars>", '
+        "Daily intelligence newsletter: one factual paragraph per category (3-5 sentences). "
+        "JSON only:\n"
+        '{"subject": "<headline ≤80 chars>", '
         f'"sections": [{sections_schema}]}}'
     )
 
@@ -164,9 +161,7 @@ def generate_newsletter(date_str: str | None = None) -> str:
         llm = get_llm_service('newsletter')
         raw = llm.chat([
             {'role': 'system', 'content': (
-                'You are a senior editor at a geopolitical intelligence newsletter. '
-                'Write clear, factual, professional summaries. '
-                'Always respond with valid JSON only — no markdown fences, no extra text.'
+                'Senior geopolitical newsletter editor. Factual, professional. JSON only, no markdown.'
             )},
             {'role': 'user', 'content': prompt_user},
         ])

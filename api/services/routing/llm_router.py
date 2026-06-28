@@ -71,30 +71,29 @@ class LLMEventRouter:
             num = start // self.BATCH_SIZE + 1
             logger.info('[router] LLM batch %d/%d (%d events)', num, total, len(batch))
 
+            # Use 1-based numeric keys instead of ObjectIds — shorter in both input and output.
+            idx_to_event = {str(i + 1): e for i, e in enumerate(batch)}
             event_lines = '\n'.join(
-                f'{i + 1}. (id={e.pk}) {(e.title or "(no title)")[:160]} '
-                f'[{e.category or "general"} | {e.location_name or "?"} | '
-                f'topics: {", ".join(e.topic_slugs or []) or "none"}]'
+                f'{i + 1}. {(e.title or "(no title)")[:160]} '
+                f'[{e.category or "general"} | {e.location_name or "?"}]'
+                + (f' [topics: {", ".join(e.topic_slugs)}]' if e.topic_slugs else '')
                 for i, e in enumerate(batch)
             )
             prompt = (
-                'You are a markets analyst. For each news event, decide which market '
-                'indicators it is likely to move and in which direction.\n\n'
-                f'INDICATOR PANEL (only use these symbols):\n{panel_lines}\n\n'
+                'Markets analyst. For each event, list affected panel indicators and direction.\n\n'
+                f'PANEL:\n{panel_lines}\n\n'
                 f'EVENTS:\n{event_lines}\n\n'
-                'Return ONLY a JSON object. Each key is the event id shown as id=<value>. '
-                'Each value is a list of {"symbol": <panel symbol>, "weight": <number -1..1>} '
-                'where the sign is direction (positive = the event pushes the symbol up, '
-                'negative = down) and the magnitude is confidence/strength. Omit symbols an '
-                'event does not affect; use an empty list if none.\n'
-                'Example: {"abc": [{"symbol": "CL=F", "weight": 0.7}, {"symbol": "^VIX", "weight": 0.5}], "def": []}'
+                'Return JSON: keys are event numbers ("1", "2", ...), values are '
+                '{symbol: weight} dicts (weight -1..1, sign = direction up/down). '
+                'Omit unaffected symbols; empty dict {} if none.\n'
+                'Example: {"1": {"CL=F": 0.7, "^VIX": -0.3}, "2": {}}'
             )
 
             try:
                 response = llm.chat(
                     [{'role': 'user', 'content': prompt}],
                     temperature=0,
-                    max_tokens=min(2000, 120 * len(batch) + 200),
+                    max_tokens=min(800, 60 * len(batch) + 100),
                 ).strip()
                 response = re.sub(r'^```(?:json)?\s*', '', response)
                 response = re.sub(r'\s*```$', '', response)
@@ -102,11 +101,9 @@ class LLMEventRouter:
                 if not isinstance(parsed, dict):
                     raise ValueError('LLM returned non-dict')
 
-                for event in batch:
+                for idx, event in idx_to_event.items():
                     key = str(event.pk)
-                    raw = parsed.get(key)
-                    cleaned = self._clean(raw, panel_set)
-                    # Empty/garbage → deterministic fallback so the event still gets routed.
+                    cleaned = self._clean(parsed.get(idx), panel_set)
                     results[key] = cleaned if cleaned else _fallback(event)
             except Exception as exc:  # noqa: BLE001 — broad: any failure falls back
                 logger.warning('[router] batch %d/%d failed (%s) — deterministic fallback', num, total, exc)
@@ -117,24 +114,19 @@ class LLMEventRouter:
 
     @staticmethod
     def _clean(raw, panel_set: set[str]) -> list[dict]:
-        if not isinstance(raw, list):
+        if not isinstance(raw, dict):
             return []
         out: list[dict] = []
-        seen: set[str] = set()
-        for item in raw:
-            if not isinstance(item, dict):
-                continue
-            sym = item.get('symbol')
-            if sym not in panel_set or sym in seen:
+        for sym, w in raw.items():
+            if sym not in panel_set:
                 continue
             try:
-                w = float(item.get('weight'))
+                w = float(w)
             except (TypeError, ValueError):
                 continue
             w = max(-1.0, min(1.0, w))
             if w == 0:
                 continue
-            seen.add(sym)
             out.append({'symbol': sym, 'weight': round(w, 4)})
         return out
 
