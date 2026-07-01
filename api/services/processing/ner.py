@@ -27,8 +27,9 @@ def _build_pipeline():
         'ner',
         model=_MODEL_NAME,
         aggregation_strategy='simple',
-        truncation=True,
-        max_length=512,
+        # transformers>=5.3's TokenClassificationPipeline no longer accepts
+        # truncation/max_length directly — they must go through tokenizer_kwargs.
+        tokenizer_kwargs={'truncation': True, 'max_length': 512},
     )
 
 
