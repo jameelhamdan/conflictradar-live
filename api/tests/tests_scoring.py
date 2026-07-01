@@ -3,22 +3,12 @@
 No database or network required — all logic is pure Python.
 
 Run standalone:
-    DJANGO_SETTINGS_MODULE=settings.base python -m services.tests_scoring
+    DJANGO_SETTINGS_MODULE=settings.base python -m tests.tests_scoring
 """
 
-import os
-import sys
+from tests._runner import bootstrap_django, run
 
-# Bootstrap Django if available so Django-dependent imports work.
-_DJANGO_READY = False
-try:
-    import django
-    if not django.conf.settings.configured:
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings.base')
-    django.setup()
-    _DJANGO_READY = True
-except Exception:
-    pass
+_DJANGO_READY = bootstrap_django()
 
 
 def test_tokenize_basic():
@@ -126,14 +116,11 @@ def test_filter_title_dupes_intra_batch():
 
     datums = [
         {'title': 'Ukraine peace negotiations begin in Vienna'},
-        {'title': 'Ukraine peace talks start in Vienna'},     # near-duplicate of [0]
+        {'title': 'Ukraine peace negotiations start in Vienna'},  # near-duplicate of [0] (jaccard ~0.67)
         {'title': 'Earthquake strikes Turkey, dozens killed'},  # different
     ]
-    # Patch the cache instance inside services.data so no Redis is needed.
-    from unittest.mock import MagicMock
-    fake_cache = MagicMock()
-    fake_cache.get.return_value = []
-    with patch.object(data_mod, 'cache', fake_cache):
+    # Patch cache_get/cache_set (services.cache) inside services.data so no Redis is needed.
+    with patch.object(data_mod, 'cache_get', return_value=[]), patch.object(data_mod, 'cache_set'):
         kept = data_mod._filter_title_dupes(datums, threshold=0.5, hours=24)
     assert len(kept) == 2
     titles = [d['title'] for d in kept]
@@ -147,12 +134,10 @@ def test_filter_title_dupes_no_title():
     if not _DJANGO_READY:
         return
 
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch
     import services.data as data_mod
 
-    fake_cache = MagicMock()
-    fake_cache.get.return_value = []
-    with patch.object(data_mod, 'cache', fake_cache):
+    with patch.object(data_mod, 'cache_get', return_value=[]), patch.object(data_mod, 'cache_set'):
         kept = data_mod._filter_title_dupes(
             [{'title': ''}, {'title': 'Real story about conflict'}],
             threshold=0.75,
@@ -221,6 +206,14 @@ def test_importance_scorer_weight_zero_honoured():
     assert final == 1.0, f'Expected 1.0 (minimum), got {final}'
 
 
+def test_importance_scorer_structural():
+    from services.scoring import ArticleImportanceScorer, score_unscored_articles
+    scorer = ArticleImportanceScorer()
+    assert scorer.BATCH_SIZE >= 1
+    assert 1.0 <= scorer.DEFAULT_SCORE <= 10.0
+    assert callable(score_unscored_articles)
+
+
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 _TESTS = [
@@ -241,18 +234,9 @@ _TESTS = [
     test_jaccard_consistency,
     test_importance_scorer_default_score,
     test_importance_scorer_weight_zero_honoured,
+    test_importance_scorer_structural,
 ]
 
 
 if __name__ == '__main__':
-    passed = failed = 0
-    for fn in _TESTS:
-        try:
-            fn()
-            print(f'  PASS  {fn.__name__}')
-            passed += 1
-        except Exception as exc:
-            print(f'  FAIL  {fn.__name__}: {exc}')
-            failed += 1
-    print(f'\n{passed} passed / {failed} failed')
-    sys.exit(1 if failed else 0)
+    run(_TESTS)

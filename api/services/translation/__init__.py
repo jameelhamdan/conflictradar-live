@@ -39,8 +39,10 @@ _get_model = lazy_loader('translation', 'TRANSLATION_ENABLED', _build_model)
 def translate_en_ar_batch(texts: list[str]) -> list[str | None]:
     """Batch-translate English texts to Arabic. Returns a list aligned with the
     input (None per item on failure or for empty/blank input)."""
+    if not texts:
+        return []
     loaded = _get_model()
-    if loaded is None or not texts:
+    if loaded is None:
         return [None] * len(texts)
     tokenizer, model = loaded
 

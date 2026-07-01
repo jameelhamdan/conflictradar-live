@@ -7,19 +7,22 @@ failure — it is the gradeable "does the whole thing work" test.
 
 What it exercises (with real data):
   1. Config / symbols       — MarketSymbol seed, market_symbols helpers, 5-symbol panel
-  2. Queue & helpers        — enqueue() sync return value, mark_stage behaviour
-  3. Fan-out fetch          — real RSS via dispatch_fetch / fetch_source workers
-  4. Fan-out process        — real NLP/LLM per-record workers + stage_status
-  5. Aggregate events       — real semantic clustering
-  6. Tag topics (LLM)       — real LLM matcher + stage_status
-  7. Route events (rules)   — deterministic router → affected_indicators + stage_status
-  8. Pipeline coverage      — pipeline_coverage() shape
-  9. Forecasting            — real price backfill → train → run → score
- 10. REST API               — /api/symbols, /api/events, /api/forecasts, /api/prices (Django test client)
- 11. Ops dashboard          — throughput / coverage / forecast-status helpers
- 12. Bootstrap guard        — idempotency of bootstrap_initial_data_task
- 13. Scoring helpers        — utils tokenize/jaccard, strip_code_fences, ArticleImportanceScorer,
-                             model fields (Article.importance_score, Source.weight), title dedup
+  2. Fan-out fetch          — real RSS via dispatch_fetch / fetch_source workers
+  3. Fan-out process        — real NLP/LLM per-record workers + stage_status
+  4. Aggregate events       — real semantic clustering
+  5. Tag topics (LLM)       — real LLM matcher + stage_status
+  6. Route events (rules)   — deterministic router → affected_indicators + stage_status
+  7. Pipeline coverage      — pipeline_coverage() shape
+  8. Forecasting            — real price backfill → train → run → score
+  9. REST API               — /api/symbols, /api/events, /api/forecasts, /api/prices (Django test client)
+ 10. Ops dashboard          — throughput / coverage / forecast-status helpers
+ 11. Bootstrap guard        — idempotency of bootstrap_initial_data_task
+
+Pure/no-DB checks that used to live here (enqueue() sync return value, mark_stage,
+tokenize/jaccard, strip_code_fences, ArticleImportanceScorer structure, model field
+existence, title dedup) now live in the dependency-light api/tests/tests_*.py suite
+(tests_queue.py, tests_utils.py, tests_scoring.py, tests_models.py) — this command is
+only for checks that genuinely need live MongoDB/network/LLM.
 
 Fan-out runs synchronously (this command forces ``TASK_QUEUE_ENABLED=False``) so the
 dispatcher → per-record worker path is fully covered without live RQ workers.
@@ -114,7 +117,6 @@ class Command(BaseCommand):
 
         try:
             self._stage_symbols(c)
-            self._stage_tracking_and_helpers(c)
             if not fast and not opts['skip_fetch']:
                 self._stage_fetch(c, opts)
             if not fast and not opts['skip_process']:
@@ -129,7 +131,6 @@ class Command(BaseCommand):
             self._stage_api(c)
             self._stage_dashboard(c)
             self._stage_bootstrap_guard(c)
-            self._stage_scoring_helpers(c)
         finally:
             settings.TASK_QUEUE_ENABLED = prev_queue
             settings.ALLOWED_HOSTS = prev_hosts
@@ -201,30 +202,10 @@ class Command(BaseCommand):
         c.hard('symbols.coingecko_nonempty', len(get_coingecko_ids()) > 0)
         c.hard('symbols.backfill_nonempty', len(get_backfill_symbols()) > 0)
 
-    # ── Stage 2: queue + stage helper ─────────────────────────────────────
-
-    def _stage_tracking_and_helpers(self, c):
-        self.stdout.write('→ Stage 2: queue & helpers')
-        from services.queue import enqueue
-        from services.utils import mark_stage
-
-        # Verify enqueue() returns the function's value when TASK_QUEUE_ENABLED=False
-        result = enqueue(lambda n: n, 7)
-        c.hard('tracking.sync_result', result == 7)
-
-        # mark_stage unit behaviour
-        class _Rec:
-            stage_status = {}
-        rec = _Rec()
-        mark_stage(rec, 'process', ok=True)
-        mark_stage(rec, 'geocode', ok=False, error='boom')
-        c.hard('stages.mark_ok', rec.stage_status.get('process', {}).get('ok') is True)
-        c.hard('stages.mark_error', rec.stage_status.get('geocode', {}).get('error') == 'boom')
-
-    # ── Stage 3: fan-out fetch (WA3) ──────────────────────────────────────
+    # ── Stage 2: fan-out fetch (WA3) ──────────────────────────────────────
 
     def _stage_fetch(self, c, opts):
-        self.stdout.write('→ Stage 3: fan-out fetch (real RSS)')
+        self.stdout.write('→ Stage 2: fan-out fetch (real RSS)')
         from core import models as core_models
         from services.tasks import dispatch_fetch_task, fetch_source_task
 
@@ -252,10 +233,10 @@ class Command(BaseCommand):
         except Exception as exc:  # noqa: BLE001
             c.soft('fetch.dispatch_ran', False, str(exc))
 
-    # ── Stage 4: fan-out process (WA3/3.6) ────────────────────────────────
+    # ── Stage 3: fan-out process (WA3/3.6) ────────────────────────────────
 
     def _stage_process(self, c, opts):
-        self.stdout.write('→ Stage 4: fan-out process (real NLP/LLM)')
+        self.stdout.write('→ Stage 3: fan-out process (real NLP/LLM)')
         from core import models as core_models
         from services.tasks import dispatch_process_articles_task
 
@@ -281,10 +262,10 @@ class Command(BaseCommand):
                    f'stage_status={ss}')
             c.soft('process.stage_status_geocode_present', 'geocode' in ss)
 
-    # ── Stage 5: aggregate ────────────────────────────────────────────────
+    # ── Stage 4: aggregate ────────────────────────────────────────────────
 
     def _stage_aggregate(self, c, opts):
-        self.stdout.write('→ Stage 5: aggregate events')
+        self.stdout.write('→ Stage 4: aggregate events')
         from core import models as core_models
         from services.tasks import aggregate_events_task
         try:
@@ -296,10 +277,10 @@ class Command(BaseCommand):
             return
         c.soft('aggregate.events_present', core_models.Event.objects.count() > 0)
 
-    # ── Stage 6: tag topics (LLM) ─────────────────────────────────────────
+    # ── Stage 5: tag topics (LLM) ─────────────────────────────────────────
 
     def _stage_tag(self, c, opts):
-        self.stdout.write('→ Stage 6: tag topics (real LLM)')
+        self.stdout.write('→ Stage 5: tag topics (real LLM)')
         from core import models as core_models
         from services.tasks import dispatch_tag_topics_task
 
@@ -319,10 +300,10 @@ class Command(BaseCommand):
         if tagged is not None:
             c.soft('tag.stage_status', 'tag' in (tagged.stage_status or {}))
 
-    # ── Stage 7: route events (deterministic rules) ───────────────────────
+    # ── Stage 6: route events (deterministic rules) ───────────────────────
 
     def _stage_route(self, c, opts, fast):
-        self.stdout.write('→ Stage 7: route events (rules router — deterministic)')
+        self.stdout.write('→ Stage 6: route events (rules router — deterministic)')
         from core import models as core_models
         from services.tasks import dispatch_route_events_task
 
@@ -353,10 +334,10 @@ class Command(BaseCommand):
             within = all(i.get('symbol') in panel for i in inds)
             c.hard('route.indicators_in_panel', within, f'{[i.get("symbol") for i in inds]}')
 
-    # ── Stage 8: pipeline coverage (WA3.6) ────────────────────────────────
+    # ── Stage 7: pipeline coverage (WA3.6) ────────────────────────────────
 
     def _stage_coverage(self, c):
-        self.stdout.write('→ Stage 8: pipeline coverage')
+        self.stdout.write('→ Stage 7: pipeline coverage')
         from services.workflow import pipeline_coverage
         try:
             cov = pipeline_coverage()
@@ -370,10 +351,10 @@ class Command(BaseCommand):
         shape_ok = all({'stage', 'label', 'need', 'action'} <= set(row) for row in cov)
         c.hard('coverage.row_shape', shape_ok)
 
-    # ── Stage 9: forecasting (real data) ──────────────────────────────────
+    # ── Stage 8: forecasting (real data) ──────────────────────────────────
 
     def _stage_forecast(self, c, opts):
-        self.stdout.write('→ Stage 9: forecasting (real backfill → train → run → score)')
+        self.stdout.write('→ Stage 8: forecasting (real backfill → train → run → score)')
         from core import models as core_models
         from services.tasks import (
             backfill_prices_task, train_forecast_model_task,
@@ -415,10 +396,10 @@ class Command(BaseCommand):
                    f'{fc.symbol}' if in_panel else f'{fc.symbol} not in {sorted(panel)}')
             c.hard('forecast.horizon_valid', fc.horizon_days in set(settings.FORECAST_HORIZONS_DAYS))
 
-    # ── Stage 10: REST API (real DB via test client) ──────────────────────
+    # ── Stage 9: REST API (real DB via test client) ──────────────────────
 
     def _stage_api(self, c):
-        self.stdout.write('→ Stage 10: REST API')
+        self.stdout.write('→ Stage 9: REST API')
         from django.test import Client
         from core import models as core_models
         client = Client()
@@ -474,10 +455,10 @@ class Command(BaseCommand):
         code, _ = get('/api/topics/')
         c.hard('api.topics_200', code == 200, f'status {code}')
 
-    # ── Stage 11: ops dashboard helpers (WA5) ─────────────────────────────
+    # ── Stage 10: ops dashboard helpers (WA5) ─────────────────────────────
 
     def _stage_dashboard(self, c):
-        self.stdout.write('→ Stage 11: ops dashboard helpers')
+        self.stdout.write('→ Stage 10: ops dashboard helpers')
         from core import admin_dashboard as dash
         try:
             tp = dash._throughput()
@@ -492,10 +473,10 @@ class Command(BaseCommand):
         except Exception as exc:  # noqa: BLE001
             c.hard('dashboard.helpers_run', False, str(exc))
 
-    # ── Stage 12: bootstrap idempotency guard (WA4) ───────────────────────
+    # ── Stage 11: bootstrap idempotency guard (WA4) ───────────────────────
 
     def _stage_bootstrap_guard(self, c):
-        self.stdout.write('→ Stage 12: bootstrap idempotency guard')
+        self.stdout.write('→ Stage 11: bootstrap idempotency guard')
         from services.cache import KEY_BOOTSTRAP_INITIAL_DATA_DONE, cache_set
         from services.tasks import bootstrap_initial_data_task
         # Pre-set the done flag so the task short-circuits WITHOUT enqueuing heavy backfills.
@@ -505,68 +486,3 @@ class Command(BaseCommand):
             c.hard('bootstrap.guard_skips', result == 0, f'returned {result} (expected 0)')
         except Exception as exc:  # noqa: BLE001
             c.hard('bootstrap.guard_runs', False, str(exc))
-
-    # ── Stage 13: scoring helpers & text utilities ────────────────────────
-
-    def _stage_scoring_helpers(self, c):
-        self.stdout.write('→ Stage 13: scoring helpers & text utilities')
-
-        # ── utils ─────────────────────────────────────────────────────
-        from services.utils import tokenize, jaccard, STOP_WORDS
-
-        a = tokenize('Ukraine ceasefire deal signed')
-        c.hard('utils.tokenize_works', 'ukraine' in a and 'ceasefire' in a,
-               f'tokens={sorted(a)}')
-        c.hard('utils.tokenize_stopwords', 'the' not in a and 'and' not in a,
-               'stop words not filtered')
-        c.hard('utils.tokenize_short_tokens_dropped', 'a' not in a,
-               'single-char token slipped through')
-        b = tokenize('Ukraine Russia peace negotiations')
-        sim = jaccard(a, b)
-        c.hard('utils.jaccard_positive', sim > 0.0, f'{sim:.3f}')
-        c.hard('utils.jaccard_self', jaccard(a, a) == 1.0)
-        c.hard('utils.jaccard_empty', jaccard(frozenset(), a) == 0.0)
-        c.hard('utils.stop_words_nonempty', len(STOP_WORDS) >= 30,
-               f'{len(STOP_WORDS)} stop words')
-
-        # ── strip_code_fences ──────────────────────────────────────────────
-        from services.llm import strip_code_fences
-        c.hard('llm.strip_json_fence',
-               strip_code_fences('```json\n[{"i":1}]\n```') == '[{"i":1}]')
-        c.hard('llm.strip_plain_fence',
-               strip_code_fences('```\n{"k":"v"}\n```') == '{"k":"v"}')
-        c.hard('llm.strip_noop', strip_code_fences('[1,2,3]') == '[1,2,3]')
-        c.hard('llm.strip_none_safe', strip_code_fences(None) == '')  # type: ignore[arg-type]
-
-        # ── ArticleImportanceScorer structural ─────────────────────────────
-        from services.scoring import ArticleImportanceScorer, score_unscored_articles
-        scorer = ArticleImportanceScorer()
-        c.hard('scoring.scorer_instantiates', isinstance(scorer, ArticleImportanceScorer))
-        c.hard('scoring.batch_size_positive', scorer.BATCH_SIZE >= 1,
-               f'BATCH_SIZE={scorer.BATCH_SIZE}')
-        c.hard('scoring.default_score_in_range',
-               1.0 <= scorer.DEFAULT_SCORE <= 10.0,
-               f'DEFAULT_SCORE={scorer.DEFAULT_SCORE}')
-        c.hard('scoring.score_unscored_callable', callable(score_unscored_articles))
-
-        # ── Model fields exist ─────────────────────────────────────────────
-        from core import models as core_models
-        article_fields = {f.name for f in core_models.Article._meta.get_fields()}
-        c.hard('model.article_importance_score', 'importance_score' in article_fields,
-               f'fields={sorted(article_fields)}')
-        c.hard('model.article_importance_source', 'importance_source' in article_fields)
-        source_fields = {f.name for f in core_models.Source._meta.get_fields()}
-        c.hard('model.source_weight', 'weight' in source_fields,
-               f'fields={sorted(source_fields)}')
-        c.hard('model.source_weight_locked', 'weight_locked' in source_fields)
-
-        # ── Intra-batch title dedup (C1 fix) ──────────────────────────────
-        from services.data import _filter_title_dupes
-        datums = [
-            {'title': 'Ukraine peace negotiations begin in Vienna'},
-            {'title': 'Ukraine peace negotiations begin in Vienna today'},  # near-duplicate
-            {'title': 'Earthquake strikes Turkey dozens killed'},           # different
-        ]
-        kept = _filter_title_dupes(datums, threshold=0.5, hours=1)
-        c.hard('scoring.title_dedup_intra_batch', len(kept) == 2,
-               f'expected 2 kept from 3, got {len(kept)}')

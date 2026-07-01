@@ -59,8 +59,10 @@ def _clean(raw: list[dict]) -> list[dict]:
 def extract_batch(texts: list[str]) -> list[list[dict]]:
     """Batch-extract entities. Returns a list aligned with the input
     ([{'text','label'}] per item; [] on failure or for blank input)."""
+    if not texts:
+        return []
     pipe = _pipeline()
-    if pipe is None or not texts:
+    if pipe is None:
         return [[] for _ in texts]
     clipped = [(t or '')[:_MAX_CHARS] for t in texts]
     try:

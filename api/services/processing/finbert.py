@@ -47,8 +47,10 @@ def _to_signed(scores: list[dict]) -> float:
 
 def score_batch(texts: list[str]) -> list[float | None]:
     """Batch-score texts. Returns a list aligned with the input (None on failure)."""
+    if not texts:
+        return []
     pipe = _pipeline()
-    if pipe is None or not texts:
+    if pipe is None:
         return [None] * len(texts)
     clipped = [(t or '')[:_MAX_CHARS] for t in texts]
     try:

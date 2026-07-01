@@ -27,8 +27,10 @@ def score_batch(texts: list[str]) -> list[float]:
     """Batch-score texts. Returns compound scores in [-1, 1] aligned with the
     input (0.0 on failure/disabled/blank input — neutral, never None, since
     this is a required field on Article)."""
+    if not texts:
+        return []
     analyzer = _analyzer()
-    if analyzer is None or not texts:
+    if analyzer is None:
         return [0.0] * len(texts)
     out = []
     for text in texts:

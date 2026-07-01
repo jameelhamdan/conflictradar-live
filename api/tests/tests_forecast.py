@@ -6,13 +6,16 @@ the as-of / leakage logic under test is the production code, not a reimplementat
 
 Run standalone (no Mongo needed):
 
-    DJANGO_SETTINGS_MODULE=settings.base python -m services.forecasting.tests_forecast
+    DJANGO_SETTINGS_MODULE=settings.base python -m tests.tests_forecast
 
 Returns a non-zero exit code if any check fails.
 """
 
-import sys
 from datetime import datetime, timedelta, timezone
+
+from tests._runner import bootstrap_django, run
+
+bootstrap_django()
 
 
 def _synthetic_bars(symbols, n=200, seed=0):
@@ -61,7 +64,7 @@ def _patch_loaders(features, symbols):
 # ── individual checks ───────────────────────────────────────────────────────────
 
 def test_to_utc_ts():
-    from . import features as F
+    from services.forecasting import features as F
     naive = datetime(2024, 1, 1)
     aware = datetime(2024, 1, 1, tzinfo=timezone.utc)
     assert str(F.to_utc_ts(naive).tz) == 'UTC'
@@ -71,24 +74,25 @@ def test_to_utc_ts():
 
 def test_router_fallback():
     """No LLM available → route_events must still populate via the deterministic router."""
-    from .routing import route_event_to_weighted_symbols
+    from services.forecasting.routing import route_event_to_weighted_symbols
     from services.routing.llm_router import LLMEventRouter
 
     out = route_event_to_weighted_symbols('conflict', 'Ukraine', ['ukraine-war'], ['war'], -0.5)
     assert out and all('symbol' in d and 'weight' in d for d in out)
-    # _clean rejects off-panel symbols and zero weights
+    # _clean rejects off-panel symbols and zero weights. It takes a {symbol: weight}
+    # dict (the shape the LLM router parses per event), not a list of {symbol, weight}.
     panel = {'GC=F', 'CL=F', 'SPY', 'BTC-USD', 'EURUSD=X'}
-    cleaned = LLMEventRouter._clean([
-        {'symbol': 'GC=F', 'weight': 0.5}, {'symbol': 'FAKE', 'weight': 0.9},
-        {'symbol': 'CL=F', 'weight': 0}, {'symbol': 'CL=F', 'weight': 2.0},
-    ], panel)
+    cleaned = LLMEventRouter._clean(
+        {'GC=F': 0.5, 'FAKE': 0.9, 'CL=F': 0, 'SPY': 2.0},
+        panel,
+    )
     syms = {c['symbol'] for c in cleaned}
-    assert syms == {'GC=F', 'CL=F'}
+    assert syms == {'GC=F', 'SPY'}  # FAKE off-panel, CL=F weight=0 both dropped; SPY clamped 2.0→1.0
     assert all(-1.0 <= c['weight'] <= 1.0 for c in cleaned)
 
 
 def test_metrics_perfect_and_naive():
-    from . import backtest as B
+    from services.forecasting import backtest as B
     yt = [1, 0, 1, 0, 1, 0]
     perfect = B._metrics(yt, [0.9, 0.1, 0.8, 0.2, 0.95, 0.05], yt)
     assert perfect['accuracy'] == 1.0
@@ -98,7 +102,7 @@ def test_metrics_perfect_and_naive():
 
 def test_asof_no_leakage():
     """A future event (after t) must NOT change the as-of feature row."""
-    from . import features as F
+    from services.forecasting import features as F
     symbols = ['GC=F', 'SPY']
     bars, events = _patch_loaders(F, symbols)
 
@@ -122,7 +126,7 @@ def test_asof_no_leakage():
 
 def test_training_labels_and_no_future_features():
     """Labels look forward (by design); features must not. Verify both."""
-    from . import features as F
+    from services.forecasting import features as F
     symbols = ['GC=F', 'SPY']
     _patch_loaders(F, symbols)
     start = datetime(2023, 2, 1, tzinfo=timezone.utc)
@@ -146,7 +150,7 @@ def test_train_predict_roundtrip():
         return
     import tempfile
     from django.conf import settings
-    from . import features as F, model as M
+    from services.forecasting import features as F, model as M
     symbols = ['GC=F', 'SPY']
     _patch_loaders(F, symbols)
     frame = F.build_training_frame(
@@ -162,30 +166,12 @@ def test_train_predict_roundtrip():
         for p in preds)
 
 
-TESTS = [
+_TESTS = [
     test_to_utc_ts, test_router_fallback, test_metrics_perfect_and_naive,
     test_asof_no_leakage, test_training_labels_and_no_future_features,
     test_train_predict_roundtrip,
 ]
 
 
-def run_all() -> int:
-    passed = failed = 0
-    for t in TESTS:
-        try:
-            t()
-            print(f'  [PASS] {t.__name__}')
-            passed += 1
-        except Exception as exc:  # noqa: BLE001
-            import traceback
-            print(f'  [FAIL] {t.__name__}: {exc}')
-            traceback.print_exc()
-            failed += 1
-    print(f'\n{passed} passed, {failed} failed')
-    return 1 if failed else 0
-
-
 if __name__ == '__main__':
-    import django
-    django.setup()
-    sys.exit(run_all())
+    run(_TESTS)

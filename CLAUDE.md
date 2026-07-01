@@ -32,8 +32,17 @@ python manage.py e2e_pipeline --skip-fetch --skip-process
 python api/tests/tests_llm_providers.py
 python api/tests/tests_llm_providers.py --provider groq
 
-# Unit tests
-python manage.py test tests
+# Unit tests — dependency-light, no Mongo/network needed (plain assert functions,
+# not unittest.TestCase, so `manage.py test` won't discover them — run as modules):
+python -m tests.tests_scoring
+python -m tests.tests_utils
+python -m tests.tests_queue
+python -m tests.tests_cache
+python -m tests.tests_models
+python -m tests.tests_processing
+python -m tests.tests_topics_matcher
+python -m tests.tests_forecasting_routing
+DJANGO_SETTINGS_MODULE=settings.base python -m tests.tests_forecast   # slower (LightGBM roundtrip)
 ```
 
 ### Frontend (from `ui/`)
